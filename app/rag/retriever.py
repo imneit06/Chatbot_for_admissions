@@ -141,18 +141,76 @@ def has_any_term(text: str, terms: list[str]) -> bool:
 
 
 def build_intent_query(question: str, doc_type: str | None) -> str:
+    q = question.lower()
+    extra_notes = []
+
     if doc_type == "admission":
+        if "xét tuyển tổng hợp" in q or "áp dụng cho" in q or "đối tượng" in q:
+            extra_notes.append(
+                "Ưu tiên mục Phương thức 2: Xét tuyển tổng hợp, đối tượng, điều kiện, "
+                "thí sinh tốt nghiệp THPT hoặc tương đương."
+            )
+
+        if "mã xét tuyển" in q or "mã ngành" in q:
+            extra_notes.append(
+                "Ưu tiên bảng tuyển sinh có tên chương trình, mã xét tuyển, mã ngành, "
+                "nhóm ngành và chỉ tiêu."
+            )
+
+        if "việt nhật" in q or "việt - nhật" in q:
+            extra_notes.append(
+                "Phân biệt Công nghệ thông tin thường với Công nghệ thông tin Việt Nhật."
+            )
+        
+        if "điểm chuẩn" in q or "điểm trúng tuyển" in q or "điểm xét tuyển" in q:
+            extra_notes.append(
+                "Điểm chuẩn trong câu hỏi tương ứng với điểm trúng tuyển trong tài liệu. "
+                "Ưu tiên bảng có cột Năm tuyển sinh 2024, Năm tuyển sinh 2025, "
+                "Phương thức tuyển sinh, Chỉ tiêu, Số nhập học, Điểm trúng tuyển. "
+                "Nếu câu hỏi không nêu năm, tìm các năm có trong bảng."
+            )
+        if "học phí" in q:
+            extra_notes.append(
+                "Ưu tiên mục 'Học phí dự kiến; lộ trình tăng học phí tối đa cho từng năm', "
+                "bảng học phí theo chương trình đào tạo và các năm học 2026-2027, "
+                "2027-2028, 2028-2029, 2029-2030. Không ưu tiên bảng mã ngành nếu câu hỏi chỉ hỏi học phí."
+            )
+
+
         return (
             question
             + "\nTập trung tìm thông tin tuyển sinh: mã ngành, tổ hợp xét tuyển, "
-              "phương thức xét tuyển, chỉ tiêu, học phí, điểm chuẩn, mã tổ hợp như A00 A01 D01."
+              "phương thức xét tuyển, chỉ tiêu, học phí, điểm chuẩn, mã tổ hợp như A00 A01 D01. "
+            + " ".join(extra_notes)
         )
 
     if doc_type == "curriculum":
+        if "tín chỉ" in q and (
+            "tối thiểu" in q or "bao nhiêu" in q or "tổng" in q
+        ):
+            extra_notes.append(
+                "Ưu tiên phần số tín chỉ đào tạo, tổng số tín chỉ, điều kiện tốt nghiệp, "
+                "công nhận tốt nghiệp, khối lượng chương trình, tổng cộng, tối thiểu, "
+                "không chỉ các nhóm môn hoặc học kỳ riêng lẻ."
+            )
+
+        if "mã ngành đào tạo" in q or "thông tin chung" in q:
+            extra_notes.append(
+                "Ưu tiên phần thông tin chung có mã ngành đào tạo, tên ngành đào tạo, "
+                "trình độ đào tạo và loại hình đào tạo."
+            )
+
+        if "tiếng nhật" in q or "việt nhật" in q or "việt - nhật" in q:
+            extra_notes.append(
+                "Ưu tiên các bảng hoặc mục có môn Tiếng Nhật, kế hoạch đào tạo tiếng Nhật, "
+                "và chương trình Công nghệ thông tin Việt Nhật."
+            )
+
         return (
             question
             + "\nTập trung tìm thông tin chương trình đào tạo: môn học, khung chương trình, "
-              "tín chỉ, môn bắt buộc, môn tự chọn, chuẩn đầu ra."
+              "tín chỉ, môn bắt buộc, môn tự chọn, chuẩn đầu ra. "
+            + " ".join(extra_notes)
         )
 
     return question
@@ -323,6 +381,141 @@ def _fuse_docs_by_rrf(
             rrf_scores[key] = (old_score + 1.0 / (60 + rank), doc)
     sorted_items = sorted(rrf_scores.items(), key=lambda x: x[1][0], reverse=True)
     return [doc for _, (_, doc) in sorted_items[:top_k]]
+
+
+def is_total_credit_query(question: str) -> bool:
+    q = question.lower()
+
+    if "tín chỉ" not in q:
+        return False
+
+    has_total_signal = any(
+        term in q
+        for term in [
+            "bao nhiêu",
+            "tối thiểu",
+            "tổng",
+            "toàn khóa",
+            "học bao nhiêu",
+        ]
+    )
+
+    has_program_signal = any(
+        term in q
+        for term in [
+            "ngành",
+            "chương trình",
+            "học",
+        ]
+    )
+
+    return has_total_signal and has_program_signal
+
+
+def build_total_credit_focus_query(question: str) -> str:
+    return (
+        question
+        + "\nTìm đúng thông tin tổng quan về số tín chỉ toàn chương trình: "
+          "số tín chỉ đào tạo, tối thiểu bao nhiêu tín chỉ, tổng số tín chỉ học toàn khóa, "
+          "điều kiện tốt nghiệp, công nhận tốt nghiệp, sinh viên đã tích lũy tối thiểu tín chỉ."
+    )
+
+
+def credit_relevance_score(doc) -> int:
+    text = (doc.page_content or "").lower()
+
+    if "tín chỉ" not in text:
+        return 0
+
+    score = 0
+
+    weighted_phrases = [
+        ("số tín chỉ đào tạo", 5),
+        ("điều kiện tốt nghiệp", 5),
+        ("công nhận tốt nghiệp", 5),
+        ("tổng số tín chỉ học toàn khóa", 5),
+        ("tổng số tín chỉ toàn khóa", 5),
+        ("tối thiểu", 3),
+        ("toàn khóa", 3),
+        ("tích lũy", 2),
+        ("khối lượng chương trình", 2),
+    ]
+
+    for phrase, weight in weighted_phrases:
+        if phrase in text:
+            score += weight
+
+    if "tổng cộng 44 tín chỉ" in text or "nhóm các môn học cơ sở ngành" in text:
+        score -= 3
+
+    if "học kỳ" in text and "toàn khóa" not in text:
+        score -= 2
+
+    return score
+
+
+def boost_total_credit_docs(docs: list, question: str) -> list:
+    if not is_total_credit_query(question):
+        return docs
+
+    scored_docs = [
+        (idx, credit_relevance_score(doc), doc)
+        for idx, doc in enumerate(docs)
+    ]
+
+    scored_docs.sort(key=lambda item: (item[1], -item[0]), reverse=True)
+
+    return [doc for _, _, doc in scored_docs]
+
+
+def build_rerank_query(question: str, plans: list[dict]) -> str:
+    intent_queries = [
+        plan["query"]
+        for plan in plans
+        if plan.get("query") and plan.get("query") != question
+    ]
+
+    if not intent_queries:
+        return question
+
+    return question + "\n" + "\n".join(intent_queries)
+
+
+def ensure_plan_doc_type_coverage(docs: list, plans: list[dict]) -> list:
+    required_doc_types = []
+    for plan in plans:
+        doc_type = plan.get("doc_type")
+        if doc_type and doc_type not in required_doc_types:
+            required_doc_types.append(doc_type)
+
+    if len(required_doc_types) < 2:
+        return docs
+
+    selected = []
+    selected_keys = set()
+
+    for doc_type in required_doc_types:
+        for doc in docs:
+            if (doc.metadata or {}).get("doc_type") != doc_type:
+                continue
+
+            key = _doc_dedup_key(doc)
+            if key in selected_keys:
+                continue
+
+            selected.append(doc)
+            selected_keys.add(key)
+            break
+
+    for doc in docs:
+        key = _doc_dedup_key(doc)
+        if key in selected_keys:
+            continue
+
+        selected.append(doc)
+        selected_keys.add(key)
+
+    return selected
     
 
 def retrieve_docs(question: str, k: int = RETRIEVAL_TOP_K):
@@ -351,24 +544,68 @@ def retrieve_docs(question: str, k: int = RETRIEVAL_TOP_K):
         fused = _fuse_docs_by_rrf([chroma_docs, bm25_docs], top_k=candidate_k)
         plan_doc_groups.append(fused)
 
-    # Broad retrieval (no doc_type filter)
-    chroma_broad = build_retriever(metadata_filter=None, k=candidate_k).invoke(question)
-    bm25_broad_raw = retrieve_with_bm25(question, k=candidate_k)
-    docstore = get_docstore()
-    bm25_broad_docs = []
-    for doc_id in bm25_broad_raw:
-        doc = docstore.mget([doc_id])
-        if doc and doc[0]:
-            bm25_broad_docs.append(doc[0])
-    broad_fused = _fuse_docs_by_rrf([chroma_broad, bm25_broad_docs], top_k=candidate_k)
-    plan_doc_groups.append(broad_fused)
+    if is_total_credit_query(question):
+        focused_query = build_total_credit_focus_query(question)
+        focused_filter = metadata_filter_from_plan({"doc_type": "curriculum"})
+
+        chroma_retriever = build_retriever(
+            metadata_filter=focused_filter,
+            k=candidate_k,
+        )
+        chroma_docs = chroma_retriever.invoke(focused_query)
+
+        bm25_raw = retrieve_with_bm25(
+            focused_query,
+            k=candidate_k,
+            doc_type="curriculum",
+        )
+
+        docstore = get_docstore()
+        bm25_docs = []
+
+        for doc_id in bm25_raw:
+            doc = docstore.mget([doc_id])
+            if doc and doc[0]:
+                bm25_docs.append(doc[0])
+
+        focused_fused = _fuse_docs_by_rrf(
+            [chroma_docs, bm25_docs],
+            top_k=candidate_k,
+        )
+        plan_doc_groups.append(focused_fused)
+
+    needs_broad_retrieval = (
+    len(plans) > 1
+    or any(plan.get("doc_type") is None for plan in plans)
+)
+
+    if needs_broad_retrieval:
+        broad_query = build_rerank_query(question, plans)
+        chroma_broad = build_retriever(metadata_filter=None, k=candidate_k).invoke(broad_query)
+        bm25_broad_raw = retrieve_with_bm25(broad_query, k=candidate_k)
+
+        docstore = get_docstore()
+        bm25_broad_docs = []
+        for doc_id in bm25_broad_raw:
+            doc = docstore.mget([doc_id])
+            if doc and doc[0]:
+                bm25_broad_docs.append(doc[0])
+
+        broad_fused = _fuse_docs_by_rrf([chroma_broad, bm25_broad_docs], top_k=candidate_k)
+        plan_doc_groups.append(broad_fused)
 
     candidate_k = max(k * 2, 10)
     candidates = _fuse_docs_by_rrf(plan_doc_groups, top_k=candidate_k)
+    rerank_query = build_rerank_query(question, plans)
+
     if RERANKER_ENABLED:
-        merged_docs = rerank(question, candidates, top_k=k)
+        reranked_docs = rerank(rerank_query, candidates, top_k=candidate_k)
+        reranked_docs = boost_total_credit_docs(reranked_docs, question)
+        merged_docs = ensure_plan_doc_type_coverage(reranked_docs, plans)[:k]
     else:
-        merged_docs = candidates[:k]
+        candidates = boost_total_credit_docs(candidates, question)
+        merged_docs = ensure_plan_doc_type_coverage(candidates, plans)[:k]
+
     return merged_docs, {"plans": plans}
     
 

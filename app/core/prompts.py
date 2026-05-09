@@ -22,6 +22,9 @@ Quy tắc về tuyển sinh:
 - Nếu câu hỏi có cả tuyển sinh và chương trình đào tạo, hãy tách câu trả lời thành:
   1. Thông tin tuyển sinh
   2. Thông tin chương trình đào tạo
+- Khi người dùng hỏi "điểm chuẩn", hãy hiểu tương ứng với "điểm trúng tuyển" trong tài liệu.
+- Nếu câu hỏi điểm chuẩn không nêu năm hoặc phương thức, không được trả lời là không tìm thấy chỉ vì thiếu năm/phương thức. Hãy trình bày các năm/phương thức có trong CONTEXT và nói rõ từng mức điểm.
+
   
 Quy tắc về chương trình đào tạo:
 - Khi người dùng hỏi về môn học, tín chỉ, khung chương trình, chuẩn đầu ra hoặc việc làm, hãy ưu tiên thông tin từ tài liệu chương trình đào tạo.

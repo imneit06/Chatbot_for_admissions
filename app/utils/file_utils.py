@@ -1,4 +1,4 @@
 from pathlib import Path
 
 def mkdir(path):
-    path.mkdir(parents=True, exists_ok=True)
+    path.mkdir(parents=True, exist_ok=True)
