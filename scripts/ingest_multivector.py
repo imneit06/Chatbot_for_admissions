@@ -1,6 +1,10 @@
 from pathlib import Path
 import json
 import shutil
+import sys
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.append(str(ROOT_DIR))
 
 from langchain_core.documents import Document  
 from langchain_core.stores import InMemoryStore  
@@ -28,6 +32,22 @@ from rag_app.core.config import (
 ID_KEY = "doc_id"
 
 
+def clean_chroma_metadata(metadata: dict) -> dict:
+    cleaned = {}
+
+    for key, value in (metadata or {}).items():
+        if value is None:
+            continue
+
+        if isinstance(value, (str, int, float, bool)):
+            cleaned[key] = value
+            continue
+
+        cleaned[key] = str(value)
+
+    return cleaned
+
+
 def load_parents():
     parents = []
 
@@ -42,7 +62,7 @@ def load_parents():
 
             doc = Document(
                 page_content=item["page_content"],
-                metadata=item["metadata"],
+                metadata=clean_chroma_metadata(item["metadata"]),
             )
 
             parents.append((doc_id, doc))
@@ -62,7 +82,7 @@ def load_children():
 
             doc = Document(
                 page_content=item["page_content"],
-                metadata=item["metadata"],
+                metadata=clean_chroma_metadata(item["metadata"]),
             )
 
             if ID_KEY not in doc.metadata:

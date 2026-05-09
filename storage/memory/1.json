@@ -1,0 +1,66 @@
+{
+  "session_id": "1",
+  "summary": "",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hoc phi cong nghe thong tin",
+      "created_at": "2026-05-09T13:53:50"
+    },
+    {
+      "role": "assistant",
+      "content": "Mình chưa tìm thấy thông tin này trong dữ liệu hiện có.",
+      "created_at": "2026-05-09T13:53:50"
+    },
+    {
+      "role": "user",
+      "content": "Các phương thức xét tuyển UIT 2026?",
+      "created_at": "2026-05-09T17:15:37"
+    },
+    {
+      "role": "assistant",
+      "content": "Các phương thức xét tuyển của Trường Đại học Công nghệ Thông tin (UIT) năm 2026 bao gồm:\n\n*   **Phương thức 1:** Tuyển thẳng theo quy chế tuyển sinh đại học của Bộ Giáo dục và Đào tạo.\n*   **Phương thức 2:** Xét tuyển tổng hợp.\n*   Đối với ngành Kỹ thuật phần mềm (mã xét tuyển 7480103_QT), có thêm phương thức tuyển sinh sinh viên quốc tế theo phương thức riêng.\n\nNguồn: [DOCUMENT 1], [DOCUMENT 2], [DOCUMENT 3], [DOCUMENT 4], [DOCUMENT 5]",
+      "created_at": "2026-05-09T17:15:37"
+    },
+    {
+      "role": "user",
+      "content": "ngành khoa học máy tính xét khối nào",
+      "created_at": "2026-05-09T17:21:19"
+    },
+    {
+      "role": "assistant",
+      "content": "Mình chưa tìm thấy thông tin này trong dữ liệu hiện có.",
+      "created_at": "2026-05-09T17:21:19"
+    },
+    {
+      "role": "user",
+      "content": "Điểm chuẩn ngành Công nghệ Thông tin?",
+      "created_at": "2026-05-09T17:25:14"
+    },
+    {
+      "role": "assistant",
+      "content": "Điểm chuẩn ngành Công nghệ Thông tin (mã ngành 7480201) và Công nghệ Thông tin (Việt Nhật) (mã ngành 7480201_VN) như sau:\n\n**Ngành Công nghệ Thông tin (mã ngành 7480201):**\n*   **Năm tuyển sinh 2024:**\n    *   Xét tuyển dựa trên kết quả Kỳ thi đánh giá năng lực do ĐHQG-HCM tổ chức: 915 điểm.\n    *   Xét tuyển dựa trên kết quả kỳ thi tốt nghiệp THPT: 27.1 điểm.\n*   **Năm tuyển sinh 2025:**\n    *   Xét tuyển dựa trên kết quả Kỳ thi đánh giá năng lực do ĐHQG-HCM tổ chức: 969 điểm.\n    *   Xét tuyển dựa trên kết quả kỳ thi tốt nghiệp THPT: 26.6 điểm.\n\n**Ngành Công nghệ Thông tin (Việt Nhật) (mã ngành 7480201_VN):**\n*   **Năm tuyển sinh 2024:**\n    *   Xét tuyển dựa trên kết quả kỳ thi tốt nghiệp THPT: 25.55 điểm.\n    *   Xét tuyển dựa trên kết quả Kỳ thi đánh giá năng lực do ĐHQG-HCM tổ chức: 850 điểm.\n*   **Năm tuyển sinh 2025:**\n    *   Xét tuyển dựa trên kết quả kỳ thi tốt nghiệp THPT: 24.2 điểm.\n    *   Xét tuyển dựa trên kết quả Kỳ thi đánh giá năng lực do ĐHQG-HCM tổ chức: 867 điểm.\n\nNguồn: [DOCUMENT 1], [DOCUMENT 3]",
+      "created_at": "2026-05-09T17:25:14"
+    },
+    {
+      "role": "user",
+      "content": "khoa học máy tính xét tổ hợp nào",
+      "created_at": "2026-05-09T17:35:01"
+    },
+    {
+      "role": "assistant",
+      "content": "Ngành Khoa học Máy tính có các tổ hợp xét tuyển như sau:\n\n*   **Ngành Khoa học Máy tính (mã ngành 7480101) - Năm tuyển sinh 2026:**\n    *   Phương thức 2: Xét tuyển tổng hợp với các tổ hợp: A00, A01, D01, D07, X06, X26.\n*   **Ngành Khoa học Máy tính (Chương trình đào tạo bằng tiếng Anh) (mã xét tuyển 7480101_TA):**\n    *   Phương thức 2: Xét tuyển tổng hợp với các tổ hợp: A01, D01, X26, D07.\n\nNguồn: [DOCUMENT 1], [DOCUMENT 4]",
+      "created_at": "2026-05-09T17:35:01"
+    },
+    {
+      "role": "user",
+      "content": "các ngành của trường UIT",
+      "created_at": "2026-05-09T17:38:09"
+    },
+    {
+      "role": "assistant",
+      "content": "Các ngành đào tạo được đề cập trong tài liệu bao gồm:\n\n*   Công nghệ Thông tin (hệ Cử nhân chính quy, liên thông, văn bằng 2)\n*   Truyền thông Đa phương tiện (hệ Cử nhân)\n*   Công nghệ Thông tin (Việt Nhật)\n\nNguồn: [DOCUMENT 1], [DOCUMENT 2], [DOCUMENT 3], [DOCUMENT 4], [DOCUMENT 5]",
+      "created_at": "2026-05-09T17:38:09"
+    }
+  ]
+}

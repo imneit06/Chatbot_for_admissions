@@ -1,0 +1,37 @@
+# Backend API
+fastapi==0.104.1
+uvicorn==0.24.0.post1
+SQLAlchemy==2.0.23
+pydantic==2.8.2
+email-validator==2.1.0.post1
+PyJWT==2.8.0
+bcrypt==4.1.2
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
+
+# RAG / LangChain
+langchain==0.3.8
+langchain-community==0.3.8
+langchain-core==0.3.21
+langchain-chroma==0.1.4
+langchain-google-genai==2.0.6
+langchain-huggingface==0.1.2
+langchain-text-splitters==0.3.2
+
+# Vector DB / Embeddings
+chromadb==0.5.23
+sentence-transformers==3.3.1
+
+# Retrieval / evaluation
+rank-bm25==0.2.2
+underthesea==6.8.4
+numpy==1.26.4
+
+# Document parsing / OCR
+pdfplumber==0.10.3
+pypdf==3.17.4
+beautifulsoup4==4.12.2
+lxml==4.9.3
+requests==2.31.0
+pytesseract==0.3.10
+Pillow==10.1.0
