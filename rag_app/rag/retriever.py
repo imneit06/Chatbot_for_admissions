@@ -10,7 +10,7 @@ try:
 except Exception:
     from langchain_classic.retrievers.multi_vector import MultiVectorRetriever  
 
-from app.core.config import (
+from rag_app.core.config import (
     PARENTS_PATH,
     CHROMA_DIR,
     CHROMA_COLLECTION_NAME,
@@ -21,8 +21,8 @@ from app.core.config import (
     RERANKER_ENABLED,
 )
 
-from app.rag.reranker import rerank
-from app.search.bm25_index import get_bm25_indexer
+from rag_app.rag.reranker import rerank
+from rag_app.search.bm25_index import get_bm25_indexer
 
 # Module-level singletons
 _embeddings = None

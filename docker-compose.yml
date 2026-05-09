@@ -8,7 +8,11 @@ services:
     volumes:
       # Ánh xạ thư mục backend ở máy bạn vào trong Docker
       # Nhờ dòng này, file uit_chatbot.db sẽ được lưu vĩnh viễn ở máy bạn, không bị mất!
-      - ./backend:/app
+        - ./backend:/app
+        - ./rag_app:/app/rag_app
+        - ./data:/app/data
+        - ./storage:/app/storage
+        - ./scripts:/app/scripts
     environment:
       - CHOKIDAR_USEPOLLING=true
 

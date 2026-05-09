@@ -29,7 +29,7 @@ const LoginPage = () => {
         // Response trả về có dạng { access_token: "...", user: {...} }
         login(response.data.user); // Lưu thông tin user vào Context
         localStorage.setItem('uit_token', response.data.access_token);
-        if(response.data.role === 'admin') navigate('/admin');
+        if(response.data.user?.role === 'admin') navigate('/admin');
         else navigate('/chat');
       } catch (err) {
         const errorMessage = err.response?.data?.detail || 'Email hoặc mật khẩu không chính xác!';

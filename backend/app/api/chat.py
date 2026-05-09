@@ -7,6 +7,9 @@ import time
 from app.db.session import get_db
 from app.models.chat_history import ChatHistory
 
+from typing import Any
+from rag_app.rag.chain import answer_question
+
 router = APIRouter()
 
 class ChatRequest(BaseModel):
@@ -16,31 +19,41 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     status: str
+    sources: list[dict[str, Any]] = []
 
 @router.post("/", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
-    time.sleep(1) # Giả lập delay
-    
-    # Logic trả lời tạm thời
-    user_msg = request.message.lower()
-    if "học phí" in user_msg:
-        reply_text = "Học phí dự kiến của UIT năm 2026 dao động từ 30 - 50 triệu VNĐ/năm tùy chương trình đào tạo."
-    elif "điểm chuẩn" in user_msg:
-        reply_text = "Điểm chuẩn các ngành của UIT năm ngoái từ 25.5 đến 28.1 điểm. Bạn muốn hỏi cụ thể ngành nào?"
-    else:
-        reply_text = f"Hệ thống đang được nâng cấp để trả lời câu hỏi: '{request.message}'. Chức năng tra cứu thông minh bằng RAG sẽ sớm ra mắt!"
+def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
+    try:
+        result = answer_question(
+            question=request.message,
+            session_id=str(request.user_id),
+        )
 
-    # Lưu vào Database (Lịch sử hỏi đáp) kèm theo user_id thật
-    new_history = ChatHistory(
-        user_id=request.user_id,
-        question=request.message,
-        answer=reply_text,
-        status="Đã trả lời"
-    )
-    db.add(new_history)
-    db.commit()
+        reply_text = result.get("answer", "")
+        sources = result.get("sources", [])
 
-    return ChatResponse(reply=reply_text, status="success")
+        chat_history = ChatHistory(
+            user_id=str(request.user_id),
+            question=request.message,
+            answer=reply_text,
+            status="Đã trả lời",
+        )
+
+        db.add(chat_history)
+        db.commit()
+        db.refresh(chat_history)
+
+        return ChatResponse(
+            reply=reply_text,
+            status="Đã trả lời",
+            sources=sources,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi khi gọi RAG: {str(e)}",
+        )
 
 # --- API MỚI: LẤY LỊCH SỬ THEO USER ---
 @router.get("/history/{user_id}")

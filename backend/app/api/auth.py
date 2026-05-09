@@ -40,15 +40,15 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_in.email).first()
     
     # 2. Kiểm tra tài khoản và mật khẩu
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Tài khoản này đã bị khóa")
-
     if not user or not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email hoặc mật khẩu không chính xác",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Tài khoản này đã bị khóa")
 
 
     # 3. Tạo token

@@ -1,6 +1,6 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from app.core.config import (
+from rag_app.core.config import (
     GEMINI_MODEL,
     LLM_TEMPERATURE,
     MEMORY_MAX_RECENT_TURNS,
@@ -8,14 +8,14 @@ from app.core.config import (
     QUESTION_REWRITE_ENABLED,
     RETRIEVAL_TOP_K,
 )
-from app.core.prompts import (
+from rag_app.core.prompts import (
     SYSTEM_PROMPT,
     RAG_PROMPT_TEMPLATE,
     REWRITE_PROMPT_TEMPLATE,
     MEMORY_SUMMARY_PROMPT_TEMPLATE,
 )
-from app.rag.retriever import retrieve_docs, format_context, format_sources
-from app.rag.memory import FileChatMemoryStore, format_messages
+from rag_app.rag.retriever import retrieve_docs, format_context, format_sources
+from rag_app.rag.memory import FileChatMemoryStore, format_messages
 
 
 memory_store = FileChatMemoryStore()

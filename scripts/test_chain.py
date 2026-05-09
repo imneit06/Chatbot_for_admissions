@@ -4,7 +4,7 @@ import sys
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT_DIR))
 
-from app.rag.chain import answer_question, clear_memory
+from rag_app.rag.chain import answer_question, clear_memory
 
 
 def main():

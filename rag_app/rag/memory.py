@@ -3,7 +3,7 @@ from datetime import datetime
 import json
 import re
 
-from app.core.config import (
+from rag_app.core.config import (
     MEMORY_DIR,
     MEMORY_MAX_RECENT_TURNS,
 )

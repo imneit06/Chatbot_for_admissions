@@ -6,8 +6,8 @@ from typing import Optional
 from rank_bm25 import BM25Okapi
 import underthesea
 
-from app.core.config import CHILDREN_PATH
-from app.utils import read_jsonl
+from rag_app.core.config import CHILDREN_PATH
+from rag_app.utils import read_jsonl
 
 
 class BM25Indexer:

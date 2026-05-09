@@ -12,7 +12,7 @@ try:
 except Exception:
     from langchain_classic.retrievers.multi_vector import MultiVectorRetriever  
 
-from app.core.config import (
+from rag_app.core.config import (
     PARENTS_PATH,
     CHILDREN_PATH,
     CHROMA_DIR,

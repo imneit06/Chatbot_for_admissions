@@ -6,3 +6,17 @@ psycopg2-binary
 email-validator
 PyJWT
 bcrypt
+
+python-dotenv
+langchain
+langchain-community
+langchain-chroma
+langchain-google-genai
+chromadb
+sentence-transformers
+rank-bm25
+underthesea
+pdfplumber
+beautifulsoup4
+lxml
+pypdf

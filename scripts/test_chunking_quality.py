@@ -5,7 +5,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter  # pyright: 
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from app.indexing.pipeline import extract_html_text_tables_images
+from rag_app.indexing.pipeline import extract_html_text_tables_images
 
 test_html = list(Path("data/raw/html").glob("*.html"))[0]
 text, tables, images = extract_html_text_tables_images(test_html)

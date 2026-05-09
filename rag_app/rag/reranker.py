@@ -1,6 +1,6 @@
 from sentence_transformers import CrossEncoder
 
-from app.core.config import RERANKER_MODEL
+from rag_app.core.config import RERANKER_MODEL
 
 _cross_encoder = None
 

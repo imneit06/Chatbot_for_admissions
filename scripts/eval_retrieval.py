@@ -5,8 +5,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
-from app.rag.retriever import build_retriever, build_vectorstore
-from app.core.config import (
+from rag_app.rag.retriever import build_retriever, build_vectorstore
+from rag_app.core.config import (
     CHROMA_DIR,
     CHROMA_COLLECTION_NAME,
     EMBEDDING_MODEL_NAME,
@@ -48,7 +48,7 @@ def build_retriever_for_eval(k=None):
 
 
 def _load_docstore():
-    from app.core.config import PARENTS_PATH
+    from rag_app.core.config import PARENTS_PATH
     from langchain_core.documents import Document  # pyright: ignore[reportMissingImports]
     from langchain_core.stores import InMemoryStore  # pyright: ignore[reportMissingImports]
 

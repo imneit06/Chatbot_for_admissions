@@ -3,7 +3,7 @@ import uuid
 import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter 
 
-from app.core.config import (
+from rag_app.core.config import (
     PROCESS_PDF,
     PROCESS_HTML,
     PDF_DIR,
@@ -13,13 +13,13 @@ from app.core.config import (
     CHUNK_SIZE,
     CHUNK_OVERLAP,
 )
-from app.core.config import PROCESSED_DIR, DOWNLOADED_IMAGES_DIR
+from rag_app.core.config import PROCESSED_DIR, DOWNLOADED_IMAGES_DIR
 
-from app.utils.jsonl_utils import write_jsonl
-from app.loaders.html_loader import extract_html_text_tables_images
-from app.chunking.text_chunker import add_text_chunks
-from app.chunking.table_chunker import add_table_children
-from app.chunking.image_chunker import add_image_children
+from rag_app.utils.jsonl_utils import write_jsonl
+from rag_app.loaders.html_loader import extract_html_text_tables_images
+from rag_app.chunking.text_chunker import add_text_chunks
+from rag_app.chunking.table_chunker import add_table_children
+from rag_app.chunking.image_chunker import add_image_children
 
 
 
@@ -169,7 +169,7 @@ def split_text_into_sections(text: str, min_section_chars: int = 300):
 
 def process_pdfs(parent_records, child_records, splitter):
 
-    from app.loaders.pdf_loader import extract_pdf_text_tables_images
+    from rag_app.loaders.pdf_loader import extract_pdf_text_tables_images
 
     pdf_files = list(PDF_DIR.rglob("*.pdf"))
     for pdf_path in pdf_files:

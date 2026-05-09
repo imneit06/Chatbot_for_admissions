@@ -7,7 +7,7 @@ import pytesseract # pyright: ignore[reportMissingImports]
 from PIL import Image, ImageOps
 from bs4 import BeautifulSoup
 
-from app.core.config import DOWNLOADED_IMAGES_DIR
+from rag_app.core.config import DOWNLOADED_IMAGES_DIR
 
 
 # ---- Image helpers ----
