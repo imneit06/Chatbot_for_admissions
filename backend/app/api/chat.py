@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 from pydantic import BaseModel
 import time
+import logging
 
 from app.db.session import get_db
 from app.models.chat_history import ChatHistory
@@ -11,6 +12,7 @@ from typing import Any
 from rag_app.rag.chain import answer_question
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 class ChatRequest(BaseModel):
     message: str
@@ -50,6 +52,7 @@ def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
         )
 
     except Exception as e:
+        logger.exception("Chat endpoint failed")
         raise HTTPException(
             status_code=500,
             detail=f"Lỗi khi gọi RAG: {str(e)}",
