@@ -37,5 +37,5 @@ env/
 .ipynb_checkpoints/
 data/eval*
 data/raw/*
-storage/chroma/
+storage/chroma/*
 storage/*.pkl
