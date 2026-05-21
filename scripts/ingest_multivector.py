@@ -27,40 +27,13 @@ from rag_app.core.config import (
     NORMALIZE_EMBEDDINGS,
     RESET_INDEX,
     CHROMA_BATCH_SIZE,
+    resolve_torch_device,
 )
 
 ID_KEY = "doc_id"
 
 def resolve_embedding_device() -> str:
-    configured_device = (EMBEDDING_DEVICE or "auto").strip().lower()
-
-    if configured_device in {"cpu", "cuda"}:
-        if configured_device == "cuda":
-            try:
-                import torch
-
-                if torch.cuda.is_available() and torch.version.cuda is not None:
-                    return "cuda"
-
-                print("Config đang chọn CUDA nhưng PyTorch không hỗ trợ CUDA. Fallback về CPU.")
-                return "cpu"
-
-            except Exception:
-                print("Không kiểm tra được CUDA. Fallback về CPU.")
-                return "cpu"
-
-        return "cpu"
-
-    try:
-        import torch
-
-        if torch.cuda.is_available() and torch.version.cuda is not None:
-            return "cuda"
-
-        return "cpu"
-
-    except Exception:
-        return "cpu"
+    return resolve_torch_device(EMBEDDING_DEVICE)
 
 def clean_chroma_metadata(metadata: dict) -> dict:
     cleaned = {}

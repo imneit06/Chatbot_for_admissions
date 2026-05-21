@@ -78,10 +78,11 @@ def load_parent_docstore():
 
 
 def build_embeddings():
+    device = EMBEDDING_DEVICE
     return HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL_NAME,
         model_kwargs={
-            "device": EMBEDDING_DEVICE,
+            "device": device,
         },
         encode_kwargs={
             "normalize_embeddings": NORMALIZE_EMBEDDINGS,

@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import logging
 from dotenv import load_dotenv  # pyright: ignore[reportMissingImports]
 
 
@@ -50,6 +51,40 @@ def get_path(key, default):
     return ROOT_DIR / path
 
 
+logger = logging.getLogger(__name__)
+
+
+def resolve_torch_device(requested_device: str | None = None) -> str:
+    requested = (requested_device or "cpu").lower().strip()
+
+    if requested in {"cuda", "gpu"} or requested.startswith("cuda:"):
+        try:
+            import torch  # pyright: ignore[reportMissingImports]
+
+            if torch.cuda.is_available():
+                return "cuda"
+        except Exception as exc:
+            logger.warning("Could not check CUDA availability: %s", exc)
+
+        logger.warning(
+            "EMBEDDING_DEVICE=%s but CUDA is not available or PyTorch is CPU-only. "
+            "Falling back to CPU.",
+            requested_device,
+        )
+        return "cpu"
+
+    if requested == "auto":
+        try:
+            import torch  # pyright: ignore[reportMissingImports]
+
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception as exc:
+            logger.warning("Could not check CUDA availability: %s. Falling back to CPU.", exc)
+            return "cpu"
+
+    return "cpu"
+
+
 # LLM
 GOOGLE_API_KEY = get_env("GOOGLE_API_KEY")
 GEMINI_MODEL = get_env("GEMINI_MODEL", "gemini-2.5-flash")
@@ -58,7 +93,7 @@ LLM_TEMPERATURE = get_float("LLM_TEMPERATURE", 0.2)
 
 # Embedding
 EMBEDDING_MODEL_NAME = get_env("EMBEDDING_MODEL_NAME", "BAAI/bge-m3")
-EMBEDDING_DEVICE = get_env("EMBEDDING_DEVICE", "cuda")
+EMBEDDING_DEVICE = resolve_torch_device(get_env("EMBEDDING_DEVICE", "cpu"))
 NORMALIZE_EMBEDDINGS = get_bool("NORMALIZE_EMBEDDINGS", True)
 
 

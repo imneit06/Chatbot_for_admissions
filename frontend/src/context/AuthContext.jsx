@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState } from 'react';
-import api from '../lib/api';
+import { authApi } from '../lib/api';
 
 export const AuthContext = createContext();
 
@@ -35,13 +35,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (credentials) => {
-    const response = await api.post('/api/v1/auth/login', credentials);
+    const response = await authApi.post('/api/v1/auth/login', credentials);
     return saveSession(response.data);
   };
 
   const register = async (userData) => {
-    const response = await api.post('/api/v1/auth/register', userData);
-    return saveSession(response.data);
+    const response = await authApi.post('/api/v1/auth/register', userData);
+
+    if (response.data?.access_token && response.data?.user) {
+      return saveSession(response.data);
+    }
+
+    return response.data;
   };
 
   const logout = () => {

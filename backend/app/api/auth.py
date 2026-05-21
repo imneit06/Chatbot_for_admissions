@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import UserCreate, UserLogin, Token
-from app.core.security import get_password_hash, verify_password, create_access_token
+from app.core.security import get_password_hash, verify_password, create_access_token, require_admin
 
 router = APIRouter()
 
@@ -58,18 +58,28 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer", "user": user_data}
 
 @router.get("/users")
-def get_all_users(db: Session = Depends(get_db)):
+def get_all_users(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
     """Lấy danh sách toàn bộ người dùng"""
     users = db.query(User).all()
     # Ẩn password hash trước khi trả về
     return [{"id": u.id, "name": u.name, "email": u.email, "role": u.role, "is_active": u.is_active} for u in users]
 
 @router.put("/users/{user_id}/toggle-status")
-def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
+def toggle_user_status(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
     """Khóa hoặc Mở khóa tài khoản"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+    if user.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="Admin không thể tự khóa tài khoản của mình")
     
     # Đảo ngược trạng thái (Đang True thành False, False thành True)
     user.is_active = not user.is_active
@@ -77,11 +87,18 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
     return {"message": "Cập nhật thành công", "is_active": user.is_active}
 
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
     """Xóa vĩnh viễn tài khoản"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+    if user.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="Admin không thể tự xóa tài khoản của mình")
     
     db.delete(user)
     db.commit()

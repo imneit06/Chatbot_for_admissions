@@ -170,6 +170,7 @@ Password: admin123456
 - `/api/v1/chat/` may return an error until RAG data is prepared and ingested.
 - Missing `GOOGLE_API_KEY` will make Gemini chat calls fail, but backend startup should still work.
 - If the machine does not have CUDA, use `EMBEDDING_DEVICE=cpu`.
+- If you see `Torch not compiled with CUDA enabled`, set `EMBEDDING_DEVICE=cpu` in the root `.env`.
 - If frontend calls the wrong backend URL, check `frontend/.env` and `VITE_API_URL`.
 - In this workspace, backend startup succeeded on port 8001. Port 8000 was blocked by Windows with `Errno 13`; use another port if that happens locally.
 

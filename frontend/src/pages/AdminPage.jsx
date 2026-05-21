@@ -1,171 +1,618 @@
-import React, { useState, useEffect } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, Database, FileText, RefreshCw, Plus, Trash2, User, Lock, Unlock } from 'lucide-react';
+import { AlertCircle, BarChart3, CheckCircle, Database, Edit3, FileText, RefreshCw, Plus, Search, Trash2, User, Lock, Unlock, X } from 'lucide-react';
 import api from '../lib/api';
+import { AuthContext } from '../context/AuthContext';
 
-// Component con: Quản lý Ngành Học
-// Component con: Quản lý Ngành Học
+const emptyMajorForm = {
+  code: '',
+  name: '',
+  fee: '',
+  admission_blocks: '',
+  description: '',
+};
+
+const splitBlocks = (blocks = '') => blocks.split(',').map((block) => block.trim()).filter(Boolean);
+
 const MajorManagementTab = () => {
   const [majors, setMajors] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ code: '', name: '', fee: '', admission_blocks: '', description: '' });
-  
-  // State mới để quản lý mảng các Tag tổ hợp môn
-  const [blocks, setBlocks] = useState([]);
-  const [blockInput, setBlockInput] = useState('');
+  const [majorSearch, setMajorSearch] = useState('');
+  const [sortBy, setSortBy] = useState('code');
+  const [modalMode, setModalMode] = useState(null);
+  const [selectedMajor, setSelectedMajor] = useState(null);
+  const [formData, setFormData] = useState(emptyMajorForm);
+  const [formError, setFormError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [toast, setToast] = useState(null);
 
   const fetchMajors = async () => {
+    setIsLoading(true);
+    setActionError('');
     try {
       const res = await api.get('/api/v1/majors/');
       setMajors(res.data);
-    } catch (error) { console.error("Lỗi lấy dữ liệu ngành:", error); }
-  };
-
-  React.useEffect(() => { fetchMajors(); }, []);
-
-  // Hàm xử lý khi gõ tổ hợp môn và nhấn Enter
-  const handleAddBlock = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault(); // Chặn form submit khi nhấn Enter
-      const newBlock = blockInput.trim().toUpperCase();
-      if (newBlock && !blocks.includes(newBlock)) {
-        setBlocks([...blocks, newBlock]);
-      }
-      setBlockInput('');
+    } catch (error) {
+      setActionError(error.response?.data?.detail || 'Không thể tải danh sách ngành học.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const removeBlock = (blockToRemove) => {
-    setBlocks(blocks.filter(b => b !== blockToRemove));
+  useEffect(() => {
+    fetchMajors();
+  }, []);
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    window.setTimeout(() => setToast(null), 2500);
   };
 
-  const handleSubmit = async (e) => {
+  const filteredMajors = useMemo(() => {
+    const query = majorSearch.trim().toLowerCase();
+
+    return majors
+      .filter((major) => {
+        if (!query) return true;
+        return [major.code, major.name, major.admission_blocks]
+          .join(' ')
+          .toLowerCase()
+          .includes(query);
+      })
+      .sort((first, second) => (first[sortBy] || '').localeCompare(second[sortBy] || '', 'vi'));
+  }, [majorSearch, majors, sortBy]);
+
+  const openCreateModal = () => {
+    setSelectedMajor(null);
+    setFormData(emptyMajorForm);
+    setFormError('');
+    setModalMode('create');
+  };
+
+  const openEditModal = (major) => {
+    setSelectedMajor(major);
+    setFormData({
+      code: major.code || '',
+      name: major.name || '',
+      fee: major.fee || '',
+      admission_blocks: major.admission_blocks || '',
+      description: major.description || '',
+    });
+    setFormError('');
+    setModalMode('edit');
+  };
+
+  const closeMajorModal = () => {
+    setModalMode(null);
+    setSelectedMajor(null);
+    setFormData(emptyMajorForm);
+    setFormError('');
+  };
+
+  const validateMajorForm = () => {
+    if (!formData.code.trim()) return 'Vui lòng nhập mã ngành.';
+    if (!formData.name.trim()) return 'Vui lòng nhập tên ngành.';
+    if (!String(formData.fee).trim()) return 'Vui lòng nhập học phí.';
+    if (!formData.admission_blocks.trim()) return 'Vui lòng nhập tổ hợp xét tuyển.';
+    return '';
+  };
+
+  const handleSubmitMajor = async (e) => {
     e.preventDefault();
-    if (blocks.length === 0) {
-      alert("Vui lòng nhập ít nhất 1 tổ hợp môn!");
+    const validationMessage = validateMajorForm();
+
+    if (validationMessage) {
+      setFormError(validationMessage);
       return;
     }
+
+    const payload = {
+      code: formData.code.trim(),
+      name: formData.name.trim(),
+      fee: String(formData.fee).trim(),
+      admission_blocks: splitBlocks(formData.admission_blocks).join(', '),
+      description: formData.description.trim(),
+    };
+
+    setIsSubmitting(true);
+    setFormError('');
+
     try {
-      // Ép mảng blocks thành chuỗi "A00, A01" trước khi gửi xuống Backend
-      const dataToSubmit = { ...formData, admission_blocks: blocks.join(', ') };
-      await api.post('/api/v1/majors/', dataToSubmit);
-      
-      setShowForm(false);
-      setFormData({ code: '', name: '', fee: '', admission_blocks: '', description: '' }); 
-      setBlocks([]); // Reset tags
-      fetchMajors();
+      if (modalMode === 'edit' && selectedMajor) {
+        await api.put(`/api/v1/majors/${selectedMajor.id}`, payload);
+        showToast('success', 'Đã cập nhật ngành học.');
+      } else {
+        await api.post('/api/v1/majors/', payload);
+        showToast('success', 'Đã thêm ngành học mới.');
+      }
+      closeMajorModal();
+      await fetchMajors();
     } catch (error) {
-      alert(error.response?.data?.detail || "Có lỗi xảy ra khi lưu ngành học!");
+      setFormError(error.response?.data?.detail || 'Có lỗi xảy ra khi lưu ngành học.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if(window.confirm("Bạn có chắc chắn muốn xóa ngành này?")) {
-      try {
-        await api.delete(`/api/v1/majors/${id}`);
-        fetchMajors();
-      } catch { alert("Lỗi khi xóa!"); }
+  const handleDeleteMajor = async () => {
+    if (!deleteTarget) return;
+
+    setIsSubmitting(true);
+    setActionError('');
+
+    try {
+      await api.delete(`/api/v1/majors/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      showToast('success', 'Đã xóa ngành học.');
+      await fetchMajors();
+    } catch (error) {
+      setActionError(error.response?.data?.detail || 'Không thể xóa ngành học.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Hàm fomat tiền VNĐ cho bảng Admin
   const formatMoney = (amount) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) return amount || 'Chưa cập nhật';
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(numericAmount);
   };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+      <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Dữ liệu Ngành học</h2>
           <p className="text-sm text-gray-500">Quản lý các ngành đào tạo và thông tin tuyển sinh</p>
         </div>
-        <button 
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-[#003366] text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-900 transition-all"
+        <button
+          onClick={openCreateModal}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#003366] text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-900 transition-all"
         >
-          {showForm ? 'Đóng Form' : '+ Thêm ngành mới'}
+          <Plus className="h-4 w-4" />
+          Thêm ngành mới
         </button>
       </div>
 
-      {showForm && (
-        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input required type="text" placeholder="Mã ngành (VD: 7480101)" value={formData.code} onChange={(e) => setFormData({...formData, code: e.target.value})} className="px-4 py-3 rounded-xl border border-gray-200 outline-none focus:border-[#0ea5e9]"/>
-            <input required type="text" placeholder="Tên ngành (VD: Khoa học Máy tính)" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="px-4 py-3 rounded-xl border border-gray-200 outline-none focus:border-[#0ea5e9]"/>
-            
-            {/* Input Học phí: Ép kiểu number */}
-            <input required type="number" placeholder="Học phí (nhập số, VD: 35000000)" value={formData.fee} onChange={(e) => setFormData({...formData, fee: e.target.value})} className="px-4 py-3 rounded-xl border border-gray-200 outline-none focus:border-[#0ea5e9]"/>
-            
-            {/* Khu vực nhập Tag Tổ hợp môn */}
-            <div className="px-4 py-2 rounded-xl border border-gray-200 bg-white flex flex-wrap gap-2 items-center focus-within:border-[#0ea5e9]">
-              {blocks.map(b => (
-                <span key={b} className="flex items-center gap-1 bg-[#0ea5e9] text-white px-2 py-1 rounded-md text-xs font-bold">
-                  {b} <button type="button" onClick={() => removeBlock(b)} className="hover:text-red-200 ml-1">×</button>
-                </span>
-              ))}
-              <input 
-                type="text" 
-                placeholder={blocks.length === 0 ? "Nhập tổ hợp (VD: A00) rồi nhấn Enter" : "Thêm tổ hợp..."}
-                value={blockInput} 
-                onChange={(e) => setBlockInput(e.target.value)}
-                onKeyDown={handleAddBlock}
-                className="flex-1 outline-none min-w-[150px] text-sm"
-              />
-            </div>
-
-            <textarea required placeholder="Mô tả ngành học..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="md:col-span-2 px-4 py-3 rounded-xl border border-gray-200 outline-none focus:border-[#0ea5e9] min-h-[100px] resize-none"></textarea>
-            <button type="submit" className="md:col-span-2 py-3 bg-[#0ea5e9] text-white font-bold rounded-xl shadow-md hover:bg-blue-600 transition-all">Lưu vào Database</button>
-          </form>
-        </motion.div>
+      {toast && (
+        <div className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
+          toast.type === 'success' ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-red-100 bg-red-50 text-red-700'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+          {toast.message}
+        </div>
       )}
 
-      {/* Bảng Danh sách */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
+      <div className="grid gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:grid-cols-[1fr_auto_auto] md:items-center">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            value={majorSearch}
+            onChange={(e) => setMajorSearch(e.target.value)}
+            placeholder="Tìm theo mã ngành, tên ngành, tổ hợp..."
+            className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-10 text-sm outline-none focus:border-[#0ea5e9]"
+          />
+          {majorSearch && (
+            <button
+              type="button"
+              onClick={() => setMajorSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              aria-label="Xóa tìm kiếm"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#0ea5e9]"
+        >
+          <option value="code">Sắp xếp theo mã</option>
+          <option value="name">Sắp xếp theo tên</option>
+        </select>
+        <button
+          type="button"
+          onClick={fetchMajors}
+          disabled={isLoading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Làm mới
+        </button>
+      </div>
+
+      {actionError && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          <AlertCircle className="h-4 w-4" />
+          {actionError}
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-black">
             <tr>
-              <th className="px-6 py-4">Mã - Tên Ngành</th>
+              <th className="px-6 py-4">Mã ngành</th>
+              <th className="px-6 py-4">Tên ngành</th>
               <th className="px-6 py-4">Học phí</th>
               <th className="px-6 py-4">Tổ hợp</th>
+              <th className="px-6 py-4">Mô tả</th>
               <th className="px-6 py-4 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody className="text-sm">
-            {majors.length === 0 ? (
-              <tr><td colSpan="4" className="text-center py-8 text-gray-400">Chưa có dữ liệu. Hãy thêm ngành học mới!</td></tr>
+            {isLoading ? (
+              <tr>
+                <td colSpan="6" className="py-10 text-center text-gray-500">Đang tải danh sách ngành...</td>
+              </tr>
+            ) : filteredMajors.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="py-10 text-center text-gray-400">Chưa có ngành học phù hợp.</td>
+              </tr>
             ) : (
-              majors.map(m => (
+              filteredMajors.map((m) => (
                 <tr key={m.id} className="border-t border-gray-50 hover:bg-gray-50">
+                  <td className="px-6 py-4 font-bold text-[#003366]">{m.code}</td>
+                  <td className="px-6 py-4 font-semibold text-gray-800">{m.name}</td>
+                  <td className="px-6 py-4 text-gray-600">{formatMoney(m.fee)}/năm</td>
                   <td className="px-6 py-4">
-                    <span className="font-bold text-gray-800 block">{m.name}</span>
-                    <span className="text-xs text-gray-400">{m.code}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {splitBlocks(m.admission_blocks).map((block) => (
+                        <span key={block} className="rounded-lg bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700">{block}</span>
+                      ))}
+                    </div>
                   </td>
-                  {/* Hiển thị tiền tệ */}
-                  <td className="px-6 py-4 text-gray-600 font-medium">{formatMoney(m.fee)}/năm</td>
-                  <td className="px-6 py-4 flex flex-wrap gap-1">
-                    {/* Cắt chuỗi hiển thị thành các Tag nhỏ */}
-                    {m.admission_blocks.split(',').map((block, idx) => (
-                       <span key={idx} className="px-2 py-1 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold">{block.trim()}</span>
-                    ))}
+                  <td className="px-6 py-4 text-gray-500">
+                    <p className="line-clamp-2 max-w-sm">{m.description || 'Chưa cập nhật'}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleDelete(m.id)} className="text-red-500 hover:bg-red-50 px-3 py-1 rounded-lg font-bold transition-all text-xs">Xóa</button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(m)}
+                        className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-50"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        Sửa
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(m)}
+                        className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Xóa
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+        </div>
+      </div>
+
+      {modalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4 py-6">
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black text-gray-900">{modalMode === 'edit' ? 'Sửa ngành học' : 'Thêm ngành học'}</h3>
+                <p className="text-sm text-gray-500">Nhập thông tin tuyển sinh hiển thị ở trang tra cứu.</p>
+              </div>
+              <button type="button" onClick={closeMajorModal} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Đóng">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                <AlertCircle className="h-4 w-4" />
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitMajor} className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-1.5 text-sm font-bold text-gray-700">
+                Mã ngành
+                <input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} className="w-full rounded-xl border border-gray-200 px-4 py-3 font-normal outline-none focus:border-[#0ea5e9]" placeholder="VD: 7480101" />
+              </label>
+              <label className="space-y-1.5 text-sm font-bold text-gray-700">
+                Tên ngành
+                <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full rounded-xl border border-gray-200 px-4 py-3 font-normal outline-none focus:border-[#0ea5e9]" placeholder="VD: Khoa học máy tính" />
+              </label>
+              <label className="space-y-1.5 text-sm font-bold text-gray-700">
+                Học phí
+                <input value={formData.fee} onChange={(e) => setFormData({ ...formData, fee: e.target.value })} className="w-full rounded-xl border border-gray-200 px-4 py-3 font-normal outline-none focus:border-[#0ea5e9]" placeholder="VD: 35000000" />
+              </label>
+              <label className="space-y-1.5 text-sm font-bold text-gray-700">
+                Tổ hợp xét tuyển
+                <input value={formData.admission_blocks} onChange={(e) => setFormData({ ...formData, admission_blocks: e.target.value })} className="w-full rounded-xl border border-gray-200 px-4 py-3 font-normal outline-none focus:border-[#0ea5e9]" placeholder="VD: A00, A01, D01" />
+              </label>
+              <label className="space-y-1.5 text-sm font-bold text-gray-700 md:col-span-2">
+                Mô tả
+                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="min-h-[120px] w-full resize-none rounded-xl border border-gray-200 px-4 py-3 font-normal outline-none focus:border-[#0ea5e9]" placeholder="Mô tả ngành học..." />
+              </label>
+              <div className="flex flex-col gap-3 md:col-span-2 md:flex-row md:justify-end">
+                <button type="button" onClick={closeMajorModal} className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50">Hủy</button>
+                <button type="submit" disabled={isSubmitting} className="rounded-xl bg-[#003366] px-4 py-3 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+                  {isSubmitting ? 'Đang lưu...' : 'Lưu ngành học'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4 py-6">
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-black text-gray-900">Xóa ngành học?</h3>
+            <p className="mt-2 text-sm text-gray-600">Bạn sắp xóa ngành <span className="font-bold">{deleteTarget.name}</span>. Thao tác này không thể hoàn tác.</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50">Hủy</button>
+              <button type="button" onClick={handleDeleteMajor} disabled={isSubmitting} className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">
+                {isSubmitting ? 'Đang xóa...' : 'Xóa'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const userFilters = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'active', label: 'Hoạt động' },
+  { id: 'locked', label: 'Bị khóa' },
+  { id: 'admin', label: 'Admin' },
+  { id: 'user', label: 'User' },
+];
+
+const formatDateTime = (value) => {
+  if (!value) return 'Chưa cập nhật';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa cập nhật';
+  return date.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+
+const StatsTab = () => {
+  const [stats, setStats] = useState(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState('');
+
+  const fetchStats = async () => {
+    setIsStatsLoading(true);
+    setStatsError('');
+    try {
+      const response = await api.get('/api/v1/admin/stats');
+      setStats(response.data);
+    } catch (error) {
+      setStatsError(error.response?.data?.detail || 'Không thể tải thống kê hệ thống.');
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const statCards = [
+    { label: 'Tổng người dùng', value: stats?.total_users ?? 0, icon: <User className="h-5 w-5" />, tone: 'bg-sky-50 text-sky-700' },
+    { label: 'Đang hoạt động', value: stats?.active_users ?? 0, icon: <Unlock className="h-5 w-5" />, tone: 'bg-emerald-50 text-emerald-700' },
+    { label: 'Bị khóa', value: stats?.locked_users ?? 0, icon: <Lock className="h-5 w-5" />, tone: 'bg-orange-50 text-orange-700' },
+    { label: 'Ngành học', value: stats?.total_majors ?? 0, icon: <Database className="h-5 w-5" />, tone: 'bg-indigo-50 text-indigo-700' },
+    { label: 'Lịch sử chat', value: stats?.total_chat_histories ?? 0, icon: <FileText className="h-5 w-5" />, tone: 'bg-purple-50 text-purple-700' },
+  ];
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Thống kê hệ thống</h2>
+          <p className="text-sm text-gray-500">Tổng quan dữ liệu người dùng, ngành học và lịch sử hỏi đáp.</p>
+        </div>
+        <button
+          type="button"
+          onClick={fetchStats}
+          disabled={isStatsLoading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-xs font-bold text-[#0ea5e9] transition-colors hover:bg-blue-100 disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${isStatsLoading ? 'animate-spin' : ''}`} />
+          Làm mới
+        </button>
+      </div>
+
+      {statsError && (
+        <div className="flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+          <AlertCircle className="h-5 w-5" />
+          {statsError}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {statCards.map((card) => (
+          <div key={card.label} className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+            <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${card.tone}`}>
+              {card.icon}
+            </div>
+            <p className="text-sm font-semibold text-gray-500">{card.label}</p>
+            <p className="mt-2 text-3xl font-black text-gray-900">{isStatsLoading && !stats ? '...' : card.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-black text-gray-900">Câu hỏi gần đây</h3>
+            <p className="text-sm text-gray-500">5 câu hỏi mới nhất trong lịch sử chat.</p>
+          </div>
+        </div>
+
+        {isStatsLoading && !stats ? (
+          <div className="rounded-2xl bg-gray-50 px-4 py-8 text-center text-sm font-semibold text-gray-500">Đang tải câu hỏi gần đây...</div>
+        ) : stats?.recent_questions?.length ? (
+          <div className="divide-y divide-gray-100">
+            {stats.recent_questions.map((item) => (
+              <div key={item.id} className="py-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <p className="font-semibold text-gray-800">{item.question}</p>
+                  <span className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[11px] font-black uppercase text-gray-500">{item.status || 'Không rõ'}</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">
+                  User: {item.user_id || 'guest'} · {formatDateTime(item.created_at)}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-gray-50 px-4 py-8 text-center text-sm font-semibold text-gray-500">Chưa có câu hỏi nào.</div>
+        )}
       </div>
     </motion.div>
   );
 };
 
+const KnowledgeTab = () => {
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const documents = [];
+
+  const openComingSoon = () => setShowComingSoon(true);
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Quản lý Tài liệu Tri thức</h2>
+          <p className="text-sm text-gray-500">Phần quản lý tri thức sẽ được kết nối với pipeline prepare/ingest ở phase RAG sau.</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={openComingSoon}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#003366] px-4 py-2 text-sm font-bold text-white opacity-60"
+          >
+            <Plus className="h-4 w-4" />
+            Upload tài liệu
+          </button>
+          <button
+            type="button"
+            onClick={openComingSoon}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-500 opacity-70"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Re-index
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+        Không có thao tác nào ở tab này chạy script Python hoặc gọi pipeline RAG trong phase hiện tại.
+      </div>
+
+      <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-6 py-4">
+          <h3 className="text-lg font-black text-gray-900">Danh sách tài liệu</h3>
+          <p className="text-sm text-gray-500">Chưa kết nối kho tài liệu. Bảng này chỉ là shell UI.</p>
+        </div>
+
+        {documents.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
+              <FileText className="h-7 w-7" />
+            </div>
+            <p className="font-bold text-gray-700">Chưa có tài liệu hiển thị</p>
+            <p className="mt-1 text-sm text-gray-500">Tài liệu sẽ được quản lý sau khi nối với pipeline prepare/ingest.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left">
+              <thead className="bg-gray-50 text-xs font-black uppercase text-gray-500">
+                <tr>
+                  <th className="px-6 py-4">Tên tài liệu</th>
+                  <th className="px-6 py-4">Nguồn</th>
+                  <th className="px-6 py-4">Trạng thái</th>
+                  <th className="px-6 py-4 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody />
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+        <h3 className="text-lg font-black text-gray-900">Action shell</h3>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {['Upload tài liệu', 'Re-index knowledge base', 'Xóa tài liệu'].map((action) => (
+            <button
+              key={action}
+              type="button"
+              onClick={openComingSoon}
+              className="rounded-2xl border border-dashed border-gray-200 px-4 py-5 text-sm font-bold text-gray-400 hover:bg-gray-50"
+            >
+              {action}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {showComingSoon && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-gray-900">Tính năng đang phát triển</h3>
+                <p className="mt-2 text-sm text-gray-500">Phần quản lý tri thức sẽ được kết nối với pipeline prepare/ingest ở phase RAG sau.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowComingSoon(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+                aria-label="Đóng thông báo"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowComingSoon(false)}
+              className="w-full rounded-xl bg-[#003366] px-4 py-3 text-sm font-bold text-white hover:bg-blue-900"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
 const AdminPage = () => {
+  const { user: currentUser } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('users'); // Mình để mặc định mở tab Users cho bạn dễ test
   const [usersList, setUsersList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [usersError, setUsersError] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [userFilter, setUserFilter] = useState('all');
+  const [actionLoading, setActionLoading] = useState({});
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const tabs = [
     { id: 'stats', name: 'Thống kê báo cáo', icon: <BarChart3 className="w-4 h-4" /> },
@@ -177,11 +624,12 @@ const AdminPage = () => {
   // Hàm tải danh sách user từ Backend
   const fetchUsers = async () => {
     setIsLoading(true);
+    setUsersError('');
     try {
       const response = await api.get('/api/v1/auth/users');
       setUsersList(response.data);
     } catch (error) {
-      console.error("Lỗi khi tải danh sách user:", error);
+      setUsersError(error.response?.data?.detail || 'Không thể tải danh sách người dùng.');
     } finally {
       setIsLoading(false);
     }
@@ -195,24 +643,66 @@ const AdminPage = () => {
   }, [activeTab]);
 
   // Hàm xử lý Khóa / Mở khóa tài khoản
-  const handleToggleStatus = async (userId) => {
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    window.setTimeout(() => setToast(null), 2500);
+  };
+
+  const filteredUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+
+    return usersList.filter((account) => {
+      if (userFilter === 'active' && !account.is_active) return false;
+      if (userFilter === 'locked' && account.is_active) return false;
+      if (userFilter === 'admin' && account.role !== 'admin') return false;
+      if (userFilter === 'user' && account.role !== 'user') return false;
+
+      if (!query) return true;
+
+      return [account.name, account.email]
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [userFilter, userSearch, usersList]);
+
+  const setActionState = (key, value) => {
+    setActionLoading((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleToggleStatus = async (targetUser) => {
+    if (targetUser.id === currentUser?.id) return;
+
+    const key = `toggle-${targetUser.id}`;
+    setActionState(key, true);
+
     try {
-      await api.put(`/api/v1/auth/users/${userId}/toggle-status`);
-      fetchUsers(); // Tải lại danh sách sau khi cập nhật
-    } catch {
-      alert("Có lỗi xảy ra khi cập nhật trạng thái!");
+      await api.put(`/api/v1/auth/users/${targetUser.id}/toggle-status`);
+      await fetchUsers();
+      showToast('success', 'Đã cập nhật trạng thái tài khoản.');
+    } catch (error) {
+      showToast('error', error.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật trạng thái.');
+    } finally {
+      setActionState(key, false);
     }
   };
 
   // Hàm xử lý Xóa tài khoản
-  const handleDeleteUser = async (userId) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản này không?")) {
-      try {
-        await api.delete(`/api/v1/auth/users/${userId}`);
-        fetchUsers(); // Tải lại danh sách sau khi xóa
-      } catch {
-        alert("Có lỗi xảy ra khi xóa người dùng!");
-      }
+  const handleDeleteUser = async () => {
+    if (!deleteTarget || deleteTarget.id === currentUser?.id) return;
+
+    const key = `delete-${deleteTarget.id}`;
+    setActionState(key, true);
+
+    try {
+      await api.delete(`/api/v1/auth/users/${deleteTarget.id}`);
+      await fetchUsers();
+      showToast('success', 'Đã xóa người dùng.');
+      setDeleteTarget(null);
+    } catch (error) {
+      showToast('error', error.response?.data?.detail || 'Có lỗi xảy ra khi xóa người dùng.');
+    } finally {
+      setActionState(key, false);
     }
   };
 
@@ -254,18 +744,77 @@ const AdminPage = () => {
         {activeTab === 'users' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Danh sách Tài khoản ({usersList.length})</h2>
-                <button onClick={fetchUsers} className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-[#0ea5e9] rounded-xl font-bold text-xs hover:bg-blue-100 transition-colors">
+              {toast && (
+                <div className={`mb-5 flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${
+                  toast.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                }`}>
+                  {toast.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                  {toast.message}
+                </div>
+              )}
+
+              <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">Danh sách Tài khoản ({filteredUsers.length}/{usersList.length})</h2>
+                  <p className="text-sm text-gray-500">Tìm kiếm, khóa/mở khóa và xóa tài khoản người dùng</p>
+                </div>
+                <button onClick={fetchUsers} disabled={isLoading} className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-[#0ea5e9] rounded-xl font-bold text-xs hover:bg-blue-100 disabled:opacity-60 transition-colors">
                   <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                   Làm mới
                 </button>
               </div>
+
+              <div className="mb-6 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Tìm theo tên hoặc email..."
+                    className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-12 pr-11 text-gray-700 outline-none focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/20"
+                  />
+                  {userSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setUserSearch('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                      aria-label="Xóa tìm kiếm"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {userFilters.map((filter) => (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      onClick={() => setUserFilter(filter.id)}
+                      className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${
+                        userFilter === filter.id
+                          ? 'bg-[#003366] text-white'
+                          : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {usersError && (
+                <div className="mb-5 flex items-center gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+                  <AlertCircle className="h-5 w-5" />
+                  {usersError}
+                </div>
+              )}
               
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="text-gray-400 text-xs uppercase tracking-widest border-b border-gray-50">
+                      <th className="py-4 pr-4 font-black">ID</th>
                       <th className="py-4 font-black">Người dùng</th>
                       <th className="py-4 font-black">Vai trò</th>
                       <th className="py-4 font-black">Trạng thái</th>
@@ -273,56 +822,67 @@ const AdminPage = () => {
                     </tr>
                   </thead>
                   <tbody className="text-sm">
-                    {usersList.map((user) => (
-                      <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan="5" className="text-center py-10 text-gray-400">Đang tải danh sách người dùng...</td>
+                      </tr>
+                    ) : filteredUsers.map((account) => {
+                      const isSelf = account.id === currentUser?.id;
+                      const toggleKey = `toggle-${account.id}`;
+                      const deleteKey = `delete-${account.id}`;
+
+                      return (
+                      <tr key={account.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-4 pr-4 font-bold text-gray-400">#{account.id}</td>
                         <td className="py-4">
-                          <p className="font-bold text-gray-700">{user.name}</p>
-                          <p className="text-xs text-gray-400">{user.email}</p>
+                          <p className="font-bold text-gray-700">{account.name}</p>
+                          <p className="text-xs text-gray-400">{account.email}</p>
                         </td>
                         <td className="py-4">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                            user.role === 'admin' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-600'
+                            account.role === 'admin' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-600'
                           }`}>
-                            {user.role}
+                            {account.role}
                           </span>
                         </td>
                         <td className="py-4">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                            user.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                            account.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
                           }`}>
-                            {user.is_active ? 'Hoạt động' : 'Bị Khóa'}
+                            {account.is_active ? 'Hoạt động' : 'Bị Khóa'}
                           </span>
                         </td>
-                        <td className="py-4 text-right space-x-2">
-                          {/* Ẩn nút Khóa/Xóa nếu đó là tài khoản Admin để tránh tự khóa mình */}
-                          {user.role !== 'admin' && (
-                            <>
-                              <button 
-                                onClick={() => handleToggleStatus(user.id)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex inline-flex items-center gap-1 ${
-                                  user.is_active 
-                                    ? 'bg-orange-50 text-orange-500 hover:bg-orange-100' 
-                                    : 'bg-green-50 text-green-600 hover:bg-green-100'
-                                }`}
-                              >
-                                {user.is_active ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                                {user.is_active ? 'Khóa' : 'Mở khóa'}
-                              </button>
-                              
-                              <button 
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors flex inline-flex items-center gap-1"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" /> Xóa
-                              </button>
-                            </>
-                          )}
+                        <td className="py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => handleToggleStatus(account)}
+                              disabled={isSelf || actionLoading[toggleKey]}
+                              title={isSelf ? 'Không thể tự khóa tài khoản của mình' : ''}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 disabled:opacity-45 disabled:cursor-not-allowed ${
+                                account.is_active 
+                                  ? 'bg-orange-50 text-orange-500 hover:bg-orange-100' 
+                                  : 'bg-green-50 text-green-600 hover:bg-green-100'
+                              }`}
+                            >
+                              {account.is_active ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                              {actionLoading[toggleKey] ? 'Đang xử lý' : account.is_active ? 'Khóa' : 'Mở khóa'}
+                            </button>
+                            
+                            <button 
+                              onClick={() => setDeleteTarget(account)}
+                              disabled={isSelf || actionLoading[deleteKey]}
+                              title={isSelf ? 'Không thể tự xóa tài khoản của mình' : ''}
+                              className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors inline-flex items-center gap-1 disabled:opacity-45 disabled:cursor-not-allowed"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Xóa
+                            </button>
+                          </div>
                         </td>
                       </tr>
-                    ))}
-                    {usersList.length === 0 && !isLoading && (
+                    )})}
+                    {filteredUsers.length === 0 && !isLoading && (
                       <tr>
-                        <td colSpan="4" className="text-center py-8 text-gray-400">Không có dữ liệu người dùng.</td>
+                        <td colSpan="5" className="text-center py-8 text-gray-400">Không có người dùng phù hợp.</td>
                       </tr>
                     )}
                   </tbody>
@@ -333,26 +893,57 @@ const AdminPage = () => {
           </motion.div>
         )}
 
-        {/* ---------------------------------------------------------------- */}
-        {/* CÁC TAB KHÁC (Chưa làm API nên mình để giao diện tĩnh như cũ) */}
-        {/* ---------------------------------------------------------------- */}
         {activeTab === 'knowledge' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-             <h2 className="text-xl font-bold text-gray-800 mb-4">Quản lý Tài liệu Tri thức (BM 4.1)</h2>
-             <p className="text-gray-500">Chức năng quản lý file PDF (RAG) sẽ được tích hợp ở giai đoạn sau.</p>
-          </motion.div>
+          <KnowledgeTab />
         )}
         {activeTab === 'stats' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-             <h2 className="text-xl font-bold text-gray-800 mb-4">Thống kê hệ thống</h2>
-             <p className="text-gray-500">Khu vực hiển thị biểu đồ thống kê theo đồ án.</p>
-          </motion.div>
+          <StatsTab />
         )}
         {activeTab === 'data' && (
           <MajorManagementTab />
         )}
 
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-gray-800">Xóa tài khoản?</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  Tài khoản <span className="font-bold text-gray-700">{deleteTarget.email}</span> sẽ bị xóa vĩnh viễn.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+                aria-label="Đóng xác nhận xóa"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUser}
+                disabled={actionLoading[`delete-${deleteTarget.id}`]}
+                className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-60"
+              >
+                {actionLoading[`delete-${deleteTarget.id}`] ? 'Đang xóa...' : 'Xóa tài khoản'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

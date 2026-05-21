@@ -6,6 +6,10 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+export const authApi = axios.create({
+  baseURL: API_BASE_URL,
+});
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('uit_token');
 
@@ -21,11 +25,11 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
 
-    if (status === 401 || status === 403) {
+    if ((status === 401 || status === 403) && !error.config?.skipAuthRedirect) {
       localStorage.removeItem('uit_user');
       localStorage.removeItem('uit_token');
 
-      if (window.location.pathname !== '/login') {
+      if (!window.location.pathname.endsWith('/login')) {
         window.location.assign('/login');
       }
     }
