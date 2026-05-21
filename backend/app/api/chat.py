@@ -70,6 +70,7 @@ def get_user_history(user_id: str, db: Session = Depends(get_db)):
         
         result.append({
             "id": h.id,
+            "created_at": local_time.isoformat(),
             "date": local_time.strftime("%d/%m/%Y"),
             "time": local_time.strftime("%H:%M"), # Bây giờ giờ sẽ hiển thị chuẩn!
             "question": h.question,
@@ -77,3 +78,24 @@ def get_user_history(user_id: str, db: Session = Depends(get_db)):
             "status": h.status
         })
     return result
+
+
+@router.delete("/history/item/{history_id}")
+def delete_history_item(
+    history_id: int,
+    user_id: str,
+    role: str = "user",
+    db: Session = Depends(get_db),
+):
+    history = db.query(ChatHistory).filter(ChatHistory.id == history_id).first()
+
+    if not history:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lịch sử chat")
+
+    if str(history.user_id) != str(user_id) and role != "admin":
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xóa lịch sử này")
+
+    db.delete(history)
+    db.commit()
+
+    return {"message": "Đã xóa lịch sử chat"}

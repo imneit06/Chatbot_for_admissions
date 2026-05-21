@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from app.api import chat, auth
+from app.api import admin, auth, chat, major
 from app.db.session import engine, Base, SessionLocal
 from app.models.user import User
 from app.core.security import get_password_hash
-from app.api import chat, auth, major
 
 # Tạo bảng DB
 Base.metadata.create_all(bind=engine)
@@ -47,6 +46,7 @@ def create_default_admin():
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(major.router, prefix="/api/v1/majors", tags=["majors"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 @app.get("/")
 def read_root():

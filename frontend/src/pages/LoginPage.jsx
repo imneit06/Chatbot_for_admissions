@@ -1,9 +1,38 @@
-import React, { useState, useContext } from 'react';
+import { useState, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, ArrowRight, Home } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Home, Loader2, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const getFriendlyAuthError = (err, fallback) => {
+  if (!err.response) {
+    return 'Không thể kết nối backend. Vui lòng kiểm tra server API đang chạy.';
+  }
+
+  const detail = err.response?.data?.detail;
+
+  if (typeof detail === 'string') {
+    const normalized = detail.toLowerCase();
+
+    if (normalized.includes('khóa') || normalized.includes('locked') || normalized.includes('inactive')) {
+      return 'Tài khoản của bạn đang bị khóa. Vui lòng liên hệ quản trị viên.';
+    }
+
+    if (
+      err.response.status === 401
+      || normalized.includes('mật khẩu')
+      || normalized.includes('password')
+    ) {
+      return 'Email hoặc mật khẩu không chính xác.';
+    }
+
+    return detail;
+  }
+
+  return fallback;
+};
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -12,44 +41,96 @@ const LoginPage = () => {
   const [name, setName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showForgotNotice, setShowForgotNotice] = useState(false);
   
-  const { login } = useContext(AuthContext);
+  const { login, register } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  const validateForm = () => {
+    const trimmedEmail = email.trim();
+    const trimmedName = name.trim();
+
+    if (!trimmedEmail) {
+      return 'Vui lòng nhập email.';
+    }
+
+    if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      return 'Email chưa đúng định dạng.';
+    }
+
+    if (!password) {
+      return 'Vui lòng nhập mật khẩu.';
+    }
+
+    if (!isLogin) {
+      if (!trimmedName) {
+        return 'Vui lòng nhập họ và tên.';
+      }
+
+      if (password.length < 6) {
+        return 'Mật khẩu cần có ít nhất 6 ký tự.';
+      }
+
+      if (!confirmPassword) {
+        return 'Vui lòng xác nhận mật khẩu.';
+      }
+
+      if (password !== confirmPassword) {
+        return 'Mật khẩu xác nhận không khớp.';
+      }
+    }
+
+    return '';
+  };
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setIsSubmitting(true);
 
     if (isLogin) {
-      // Logic Đăng nhập
       try {
-        const response = await axios.post('http://localhost:8000/api/v1/auth/login', {
-          email, password
+        await login({
+          email: email.trim(),
+          password,
         });
-        // Response trả về có dạng { access_token: "...", user: {...} }
-        login(response.data.user); // Lưu thông tin user vào Context
-        localStorage.setItem('uit_token', response.data.access_token);
-        if(response.data.user?.role === 'admin') navigate('/admin');
-        else navigate('/chat');
-      } catch (err) {
-        const errorMessage = err.response?.data?.detail || 'Email hoặc mật khẩu không chính xác!';
-        setError(errorMessage);
-      }
-    } else {
-      // Logic Đăng ký (Tạm thời giả lập báo lỗi để bạn nối API sau)
-      if (password !== confirmPassword) {
-        setError('Mật khẩu xác nhận không khớp!');
-        return;
-      }
-      try {
-        const regResponse = await axios.post('http://localhost:8000/api/v1/auth/register', {
-          name, email, password
-        });
-        login(regResponse.data.user);
-        localStorage.setItem('uit_token', regResponse.data.access_token);
         navigate('/chat');
       } catch (err) {
-        setError(err.response?.data?.detail || 'Lỗi đăng ký, vui lòng thử lại!');
+        setError(getFriendlyAuthError(err, 'Email hoặc mật khẩu không chính xác.'));
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      try {
+        const authData = await register({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+        });
+
+        if (authData?.access_token) {
+          navigate('/chat');
+          return;
+        }
+
+        setIsLogin(true);
+        setPassword('');
+        setConfirmPassword('');
+        setSuccess('Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.');
+      } catch (err) {
+        setError(getFriendlyAuthError(err, 'Đăng ký chưa thành công. Vui lòng kiểm tra thông tin và thử lại.'));
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -89,11 +170,17 @@ const LoginPage = () => {
               exit={{ opacity: 0, x: isLogin ? 20 : -20 }}
               transition={{ duration: 0.3 }}
               onSubmit={handleAuthSubmit}
+              noValidate
               className="space-y-4"
             >
               {error && (
-                <div className="text-red-300 text-sm font-bold text-center bg-red-500/20 py-2.5 rounded-2xl mb-4 border border-red-500/30">
+                <div className="text-red-100 text-sm font-bold text-center bg-red-500/25 py-3 px-4 rounded-2xl mb-4 border border-red-300/30">
                   {error}
+                </div>
+              )}
+              {success && (
+                <div className="text-emerald-100 text-sm font-bold text-center bg-emerald-500/25 py-3 px-4 rounded-2xl mb-4 border border-emerald-300/30">
+                  {success}
                 </div>
               )}
 
@@ -102,7 +189,6 @@ const LoginPage = () => {
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/80" />
                   <input 
                     type="text" 
-                    required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Họ và tên" 
@@ -114,8 +200,8 @@ const LoginPage = () => {
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/80" />
                 <input 
-                  type="email" 
-                  required
+                  type="text"
+                  inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email" 
@@ -127,7 +213,6 @@ const LoginPage = () => {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/80" />
                 <input 
                   type="password" 
-                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Mật khẩu" 
@@ -140,7 +225,6 @@ const LoginPage = () => {
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/80" />
                   <input 
                     type="password" 
-                    required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Xác nhận mật khẩu" 
@@ -151,16 +235,32 @@ const LoginPage = () => {
 
               {isLogin && (
                 <div className="flex justify-end">
-                  <a href="#" className="text-sm text-blue-100 hover:text-white transition-colors">Quên mật khẩu?</a>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotNotice(true)}
+                    className="text-sm text-blue-100 hover:text-white transition-colors"
+                  >
+                    Quên mật khẩu?
+                  </button>
                 </div>
               )}
 
               <button 
                 type="submit" 
-                className="w-full bg-[#0ea5e9] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-400 hover:shadow-[0_0_20px_rgba(14,165,233,0.5)] transition-all hover:-translate-y-0.5 mt-6"
+                disabled={isSubmitting}
+                className="w-full bg-[#0ea5e9] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-400 hover:shadow-[0_0_20px_rgba(14,165,233,0.5)] transition-all hover:-translate-y-0.5 mt-6 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
               >
-                {isLogin ? 'Đăng nhập' : 'Đăng ký ngay'}
-                <ArrowRight className="w-5 h-5" />
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    {isLogin ? 'Đăng nhập' : 'Đăng ký ngay'}
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
               </button>
             </motion.form>
           </AnimatePresence>
@@ -171,6 +271,7 @@ const LoginPage = () => {
                 setIsLogin(!isLogin); // Lật trạng thái Đăng nhập/Đăng ký
                 // Reset toàn bộ các ô nhập liệu và thông báo lỗi
                 setError('');
+                setSuccess('');
                 setEmail('');
                 setPassword('');
                 setName('');
@@ -184,6 +285,47 @@ const LoginPage = () => {
 
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {showForgotNotice && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.96 }}
+              className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl"
+            >
+              <button
+                type="button"
+                onClick={() => setShowForgotNotice(false)}
+                className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+                aria-label="Đóng thông báo"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-[#0ea5e9]">
+                <Lock className="h-7 w-7" />
+              </div>
+              <h3 className="mb-2 text-xl font-black text-[#003366]">Quên mật khẩu</h3>
+              <p className="mb-6 text-sm leading-6 text-gray-500">
+                Tính năng quên mật khẩu đang được phát triển.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowForgotNotice(false)}
+                className="w-full rounded-2xl bg-[#0ea5e9] py-3 font-bold text-white hover:bg-blue-600"
+              >
+                Đã hiểu
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

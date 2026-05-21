@@ -27,10 +27,13 @@ from rag_app.core.config import (
     NORMALIZE_EMBEDDINGS,
     RESET_INDEX,
     CHROMA_BATCH_SIZE,
+    resolve_torch_device,
 )
 
 ID_KEY = "doc_id"
 
+def resolve_embedding_device() -> str:
+    return resolve_torch_device(EMBEDDING_DEVICE)
 
 def clean_chroma_metadata(metadata: dict) -> dict:
     cleaned = {}
@@ -97,16 +100,18 @@ def load_children():
 
 
 def build_embeddings():
+    device = resolve_embedding_device()
+    print(f"Embedding device: {device}")
+
     return HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL_NAME,
         model_kwargs={
-            "device": EMBEDDING_DEVICE,
+            "device": device,
         },
         encode_kwargs={
             "normalize_embeddings": NORMALIZE_EMBEDDINGS,
         },
     )
-
 
 def build_vectorstore():
     embeddings = build_embeddings()
