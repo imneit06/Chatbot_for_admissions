@@ -24,3 +24,5 @@ def get_db():
 
 from app.models.user import User
 from app.models.major import Major
+from app.models.chat_history import ChatHistory
+from app.models.knowledge_document import KnowledgeDocument

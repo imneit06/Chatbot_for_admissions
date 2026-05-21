@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, BarChart3, CheckCircle, Database, Edit3, FileText, RefreshCw, Plus, Search, Trash2, User, Lock, Unlock, X } from 'lucide-react';
+import { AlertCircle, BarChart3, CheckCircle, Database, Edit3, Eye, FileText, RefreshCw, Plus, Search, Trash2, Upload, User, Lock, Unlock, X } from 'lucide-react';
 import api from '../lib/api';
 import { AuthContext } from '../context/AuthContext';
 
@@ -487,114 +487,358 @@ const StatsTab = () => {
   );
 };
 
-const KnowledgeTab = () => {
-  const [showComingSoon, setShowComingSoon] = useState(false);
-  const documents = [];
+const knowledgeStatusStyles = {
+  uploaded: 'bg-blue-50 text-blue-700 border-blue-100',
+  processing: 'bg-amber-50 text-amber-700 border-amber-100',
+  indexed: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  failed: 'bg-red-50 text-red-700 border-red-100',
+  deleted: 'bg-gray-100 text-gray-500 border-gray-200',
+};
 
-  const openComingSoon = () => setShowComingSoon(true);
+const allowedKnowledgeExtensions = ['pdf', 'html', 'htm', 'txt', 'md'];
+
+const KnowledgeTab = () => {
+  const [documents, setDocuments] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [knowledgeError, setKnowledgeError] = useState('');
+  const [toast, setToast] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [errorTarget, setErrorTarget] = useState(null);
+
+  const showKnowledgeToast = (type, message) => {
+    setToast({ type, message });
+    window.setTimeout(() => setToast(null), 2600);
+  };
+
+  const fetchKnowledgeData = async () => {
+    setIsLoadingDocs(true);
+    setKnowledgeError('');
+
+    try {
+      const [docsResponse, statusResponse] = await Promise.all([
+        api.get('/api/v1/knowledge/documents'),
+        api.get('/api/v1/knowledge/status'),
+      ]);
+      setDocuments(docsResponse.data || []);
+      setSummary(statusResponse.data || null);
+    } catch (error) {
+      setKnowledgeError(error.response?.data?.detail || 'Không thể tải danh sách tài liệu tri thức.');
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchKnowledgeData();
+  }, []);
+
+  useEffect(() => {
+    const hasProcessingDocument = documents.some((doc) => doc.status === 'processing');
+
+    if (!hasProcessingDocument) return undefined;
+
+    const intervalId = window.setInterval(fetchKnowledgeData, 4000);
+    return () => window.clearInterval(intervalId);
+  }, [documents]);
+
+  const validateSelectedFile = (file) => {
+    if (!file) return 'Vui lòng chọn một file.';
+
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!extension || !allowedKnowledgeExtensions.includes(extension)) {
+      return 'Chỉ hỗ trợ PDF, HTML, TXT hoặc MD.';
+    }
+
+    return '';
+  };
+
+  const handleUpload = async (event) => {
+    event.preventDefault();
+    const validationMessage = validateSelectedFile(selectedFile);
+
+    if (validationMessage) {
+      setKnowledgeError(validationMessage);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    setIsUploading(true);
+    setKnowledgeError('');
+
+    try {
+      await api.post('/api/v1/knowledge/upload', formData);
+      setSelectedFile(null);
+      event.target.reset();
+      showKnowledgeToast('success', 'Upload thành công. Backend đang cập nhật RAG index.');
+      await fetchKnowledgeData();
+    } catch (error) {
+      setKnowledgeError(error.response?.data?.detail || 'Upload thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleReindex = async (document) => {
+    setActionLoadingId(`reindex-${document.id}`);
+    setKnowledgeError('');
+
+    try {
+      await api.post(`/api/v1/knowledge/documents/${document.id}/reindex`);
+      showKnowledgeToast('success', 'Đã trigger re-index tài liệu.');
+      await fetchKnowledgeData();
+    } catch (error) {
+      setKnowledgeError(error.response?.data?.detail || 'Không thể re-index tài liệu này.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!deleteTarget) return;
+
+    setActionLoadingId(`delete-${deleteTarget.id}`);
+    setKnowledgeError('');
+
+    try {
+      await api.delete(`/api/v1/knowledge/documents/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      showKnowledgeToast('success', 'Đã xóa tài liệu và trigger rebuild index.');
+      await fetchKnowledgeData();
+    } catch (error) {
+      setKnowledgeError(error.response?.data?.detail || 'Không thể xóa tài liệu này.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const summaryCards = [
+    { label: 'Tổng', value: summary?.total ?? 0 },
+    { label: 'Indexed', value: summary?.indexed ?? 0 },
+    { label: 'Processing', value: summary?.processing ?? 0 },
+    { label: 'Failed', value: summary?.failed ?? 0 },
+    { label: 'Uploaded', value: summary?.uploaded ?? 0 },
+    { label: 'Deleted', value: summary?.deleted ?? 0 },
+  ];
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
-        <div>
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold text-gray-800">Quản lý Tài liệu Tri thức</h2>
-          <p className="text-sm text-gray-500">Phần quản lý tri thức sẽ được kết nối với pipeline prepare/ingest ở phase RAG sau.</p>
+          <p className="mt-1 text-sm text-gray-500">Upload PDF/HTML/TXT/MD để backend lưu file và chạy prepare/ingest ngầm.</p>
+
+          <form onSubmit={handleUpload} className="mt-5 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4">
+            <label className="block text-sm font-bold text-gray-700">
+              Chọn tài liệu
+              <input
+                type="file"
+                accept=".pdf,.html,.htm,.txt,.md"
+                onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+                className="mt-2 block w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-[#003366] file:px-3 file:py-2 file:text-sm file:font-bold file:text-white"
+              />
+            </label>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs font-semibold text-gray-500">
+                TXT/MD sẽ được convert sang HTML đơn giản để dùng pipeline hiện tại.
+              </p>
+              <button
+                type="submit"
+                disabled={isUploading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#003366] px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
+              >
+                <Upload className="h-4 w-4" />
+                {isUploading ? 'Đang upload...' : 'Upload'}
+              </button>
+            </div>
+          </form>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={openComingSoon}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#003366] px-4 py-2 text-sm font-bold text-white opacity-60"
-          >
-            <Plus className="h-4 w-4" />
-            Upload tài liệu
-          </button>
-          <button
-            type="button"
-            onClick={openComingSoon}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-500 opacity-70"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Re-index
-          </button>
+
+        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-black text-gray-900">Trạng thái index</h3>
+              <p className="text-sm text-gray-500">Tự refresh khi có tài liệu processing.</p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchKnowledgeData}
+              disabled={isLoadingDocs}
+              className="rounded-xl border border-gray-200 p-2 text-gray-500 hover:bg-gray-50 disabled:opacity-60"
+              aria-label="Làm mới tri thức"
+              title="Làm mới"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoadingDocs ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {summaryCards.map((item) => (
+              <div key={item.label} className="rounded-2xl bg-gray-50 p-3">
+                <p className="text-xs font-bold uppercase text-gray-400">{item.label}</p>
+                <p className="mt-1 text-2xl font-black text-gray-900">{item.value}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
+      {toast && (
+        <div className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold ${
+          toast.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+          {toast.message}
+        </div>
+      )}
+
+      {knowledgeError && (
+        <div className="flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+          <AlertCircle className="h-5 w-5" />
+          {knowledgeError}
+        </div>
+      )}
+
       <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-        Không có thao tác nào ở tab này chạy script Python hoặc gọi pipeline RAG trong phase hiện tại.
+        Phase này rebuild full index từ raw documents. Incremental indexing và Chroma delete granular để phase sau.
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">
           <h3 className="text-lg font-black text-gray-900">Danh sách tài liệu</h3>
-          <p className="text-sm text-gray-500">Chưa kết nối kho tài liệu. Bảng này chỉ là shell UI.</p>
+          <p className="text-sm text-gray-500">Theo dõi trạng thái ingest và lỗi nếu có.</p>
         </div>
 
-        {documents.length === 0 ? (
+        {isLoadingDocs && documents.length === 0 ? (
+          <div className="px-6 py-14 text-center text-sm font-bold text-gray-500">Đang tải tài liệu...</div>
+        ) : documents.length === 0 ? (
           <div className="px-6 py-14 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
               <FileText className="h-7 w-7" />
             </div>
-            <p className="font-bold text-gray-700">Chưa có tài liệu hiển thị</p>
-            <p className="mt-1 text-sm text-gray-500">Tài liệu sẽ được quản lý sau khi nối với pipeline prepare/ingest.</p>
+            <p className="font-bold text-gray-700">Chưa có tài liệu tri thức</p>
+            <p className="mt-1 text-sm text-gray-500">Upload file đầu tiên để backend chạy prepare/ingest.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left">
+            <table className="w-full min-w-[980px] text-left">
               <thead className="bg-gray-50 text-xs font-black uppercase text-gray-500">
                 <tr>
-                  <th className="px-6 py-4">Tên tài liệu</th>
-                  <th className="px-6 py-4">Nguồn</th>
-                  <th className="px-6 py-4">Trạng thái</th>
-                  <th className="px-6 py-4 text-right">Thao tác</th>
+                  <th className="px-6 py-4">File name</th>
+                  <th className="px-6 py-4">Type</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">Uploaded at</th>
+                  <th className="px-6 py-4">Indexed at</th>
+                  <th className="px-6 py-4">Error</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody />
+              <tbody className="text-sm">
+                {documents.map((document) => {
+                  const isBusy = actionLoadingId?.endsWith(`-${document.id}`) || document.status === 'processing';
+                  const isDeleted = document.status === 'deleted';
+
+                  return (
+                    <tr key={document.id} className="border-t border-gray-50 hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <p className="max-w-[240px] truncate font-bold text-gray-800" title={document.original_filename}>
+                          {document.original_filename}
+                        </p>
+                        <p className="max-w-[240px] truncate text-xs text-gray-400" title={document.filename}>{document.filename}</p>
+                      </td>
+                      <td className="px-6 py-4 font-bold uppercase text-gray-500">{document.file_type}</td>
+                      <td className="px-6 py-4">
+                        <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${knowledgeStatusStyles[document.status] || knowledgeStatusStyles.uploaded}`}>
+                          {document.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-500">{formatDateTime(document.created_at)}</td>
+                      <td className="px-6 py-4 text-gray-500">{document.indexed_at ? formatDateTime(document.indexed_at) : 'Chưa index'}</td>
+                      <td className="px-6 py-4">
+                        {document.error_message ? (
+                          <button
+                            type="button"
+                            onClick={() => setErrorTarget(document)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View error
+                          </button>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleReindex(document)}
+                            disabled={isBusy || isDeleted}
+                            className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${document.status === 'processing' ? 'animate-spin' : ''}`} />
+                            Re-index
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(document)}
+                            disabled={isBusy || isDeleted}
+                            className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
             </table>
           </div>
         )}
       </div>
 
-      <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-black text-gray-900">Action shell</h3>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {['Upload tài liệu', 'Re-index knowledge base', 'Xóa tài liệu'].map((action) => (
-            <button
-              key={action}
-              type="button"
-              onClick={openComingSoon}
-              className="rounded-2xl border border-dashed border-gray-200 px-4 py-5 text-sm font-bold text-gray-400 hover:bg-gray-50"
-            >
-              {action}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {showComingSoon && (
+      {errorTarget && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-black text-gray-900">Tính năng đang phát triển</h3>
-                <p className="mt-2 text-sm text-gray-500">Phần quản lý tri thức sẽ được kết nối với pipeline prepare/ingest ở phase RAG sau.</p>
+                <h3 className="text-xl font-black text-gray-900">Ingest error</h3>
+                <p className="text-sm text-gray-500">{errorTarget.original_filename}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowComingSoon(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
-                aria-label="Đóng thông báo"
-              >
+              <button type="button" onClick={() => setErrorTarget(null)} className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200" aria-label="Đóng lỗi">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowComingSoon(false)}
-              className="w-full rounded-xl bg-[#003366] px-4 py-3 text-sm font-bold text-white hover:bg-blue-900"
-            >
-              Đã hiểu
-            </button>
+            <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-2xl bg-red-50 p-4 text-sm text-red-700">{errorTarget.error_message}</pre>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-gray-900">Xóa tài liệu?</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  File <span className="font-bold text-gray-700">{deleteTarget.original_filename}</span> sẽ được đánh dấu deleted và rebuild full index.
+                </p>
+              </div>
+              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200" aria-label="Đóng xác nhận xóa">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50">Hủy</button>
+              <button type="button" onClick={handleDeleteDocument} disabled={actionLoadingId === `delete-${deleteTarget.id}`} className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-60">
+                {actionLoadingId === `delete-${deleteTarget.id}` ? 'Đang xóa...' : 'Xóa tài liệu'}
+              </button>
+            </div>
           </div>
         </div>
       )}

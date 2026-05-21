@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models.chat_history import ChatHistory
 from app.models.major import Major
 from app.models.user import User
+from app.services.major_seed_service import seed_uit_majors
 
 router = APIRouter()
 
@@ -39,3 +40,11 @@ def get_admin_stats(
             for item in recent_questions
         ],
     }
+
+
+@router.post("/seed-majors")
+def seed_majors(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    return seed_uit_majors(db)

@@ -165,12 +165,34 @@ Email: admin@uit.edu.vn
 Password: admin123456
 ```
 
+## Seed UIT Majors
+
+From the repository root:
+
+```bash
+python scripts/seed_uit_majors.py
+```
+
+The script is idempotent and upserts majors by `code`.
+
+## Admin Knowledge Upload
+
+1. Login as admin.
+2. Open `/admin`.
+3. Select `Tri thức Chatbot`.
+4. Upload a PDF, HTML, TXT, or MD file.
+5. Wait until the document status becomes `indexed`.
+6. Open `/chat` and ask a question related to the uploaded document.
+
+TXT and MD uploads are converted to simple HTML for the current RAG pipeline.
+
 ## Known Issues
 
 - `/api/v1/chat/` may return an error until RAG data is prepared and ingested.
 - Missing `GOOGLE_API_KEY` will make Gemini chat calls fail, but backend startup should still work.
 - If the machine does not have CUDA, use `EMBEDDING_DEVICE=cpu`.
 - If you see `Torch not compiled with CUDA enabled`, set `EMBEDDING_DEVICE=cpu` in the root `.env`.
+- Admin Knowledge upload rebuilds the full index from raw documents in this phase. Incremental indexing and granular Chroma delete are TODOs for a later RAG phase.
 - If frontend calls the wrong backend URL, check `frontend/.env` and `VITE_API_URL`.
 - In this workspace, backend startup succeeded on port 8001. Port 8000 was blocked by Windows with `Errno 13`; use another port if that happens locally.
 
