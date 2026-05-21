@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import axios from 'axios';
 import { BarChart3, Database, FileText, RefreshCw, Plus, Trash2, User, Lock, Unlock } from 'lucide-react';
+import api from '../lib/api';
 
 // Component con: Quản lý Ngành Học
 // Component con: Quản lý Ngành Học
@@ -16,7 +16,7 @@ const MajorManagementTab = () => {
 
   const fetchMajors = async () => {
     try {
-      const res = await axios.get('http://localhost:8000/api/v1/majors/');
+      const res = await api.get('/api/v1/majors/');
       setMajors(res.data);
     } catch (error) { console.error("Lỗi lấy dữ liệu ngành:", error); }
   };
@@ -48,7 +48,7 @@ const MajorManagementTab = () => {
     try {
       // Ép mảng blocks thành chuỗi "A00, A01" trước khi gửi xuống Backend
       const dataToSubmit = { ...formData, admission_blocks: blocks.join(', ') };
-      await axios.post('http://localhost:8000/api/v1/majors/', dataToSubmit);
+      await api.post('/api/v1/majors/', dataToSubmit);
       
       setShowForm(false);
       setFormData({ code: '', name: '', fee: '', admission_blocks: '', description: '' }); 
@@ -62,9 +62,9 @@ const MajorManagementTab = () => {
   const handleDelete = async (id) => {
     if(window.confirm("Bạn có chắc chắn muốn xóa ngành này?")) {
       try {
-        await axios.delete(`http://localhost:8000/api/v1/majors/${id}`);
+        await api.delete(`/api/v1/majors/${id}`);
         fetchMajors();
-      } catch (error) { alert("Lỗi khi xóa!"); }
+      } catch { alert("Lỗi khi xóa!"); }
     }
   };
 
@@ -178,7 +178,7 @@ const AdminPage = () => {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('http://localhost:8000/api/v1/auth/users');
+      const response = await api.get('/api/v1/auth/users');
       setUsersList(response.data);
     } catch (error) {
       console.error("Lỗi khi tải danh sách user:", error);
@@ -197,9 +197,9 @@ const AdminPage = () => {
   // Hàm xử lý Khóa / Mở khóa tài khoản
   const handleToggleStatus = async (userId) => {
     try {
-      await axios.put(`http://localhost:8000/api/v1/auth/users/${userId}/toggle-status`);
+      await api.put(`/api/v1/auth/users/${userId}/toggle-status`);
       fetchUsers(); // Tải lại danh sách sau khi cập nhật
-    } catch (error) {
+    } catch {
       alert("Có lỗi xảy ra khi cập nhật trạng thái!");
     }
   };
@@ -208,9 +208,9 @@ const AdminPage = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản này không?")) {
       try {
-        await axios.delete(`http://localhost:8000/api/v1/auth/users/${userId}`);
+        await api.delete(`/api/v1/auth/users/${userId}`);
         fetchUsers(); // Tải lại danh sách sau khi xóa
-      } catch (error) {
+      } catch {
         alert("Có lỗi xảy ra khi xóa người dùng!");
       }
     }

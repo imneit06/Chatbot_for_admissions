@@ -31,6 +31,36 @@ from rag_app.core.config import (
 
 ID_KEY = "doc_id"
 
+def resolve_embedding_device() -> str:
+    configured_device = (EMBEDDING_DEVICE or "auto").strip().lower()
+
+    if configured_device in {"cpu", "cuda"}:
+        if configured_device == "cuda":
+            try:
+                import torch
+
+                if torch.cuda.is_available() and torch.version.cuda is not None:
+                    return "cuda"
+
+                print("Config đang chọn CUDA nhưng PyTorch không hỗ trợ CUDA. Fallback về CPU.")
+                return "cpu"
+
+            except Exception:
+                print("Không kiểm tra được CUDA. Fallback về CPU.")
+                return "cpu"
+
+        return "cpu"
+
+    try:
+        import torch
+
+        if torch.cuda.is_available() and torch.version.cuda is not None:
+            return "cuda"
+
+        return "cpu"
+
+    except Exception:
+        return "cpu"
 
 def clean_chroma_metadata(metadata: dict) -> dict:
     cleaned = {}
@@ -97,16 +127,18 @@ def load_children():
 
 
 def build_embeddings():
+    device = resolve_embedding_device()
+    print(f"Embedding device: {device}")
+
     return HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL_NAME,
         model_kwargs={
-            "device": EMBEDDING_DEVICE,
+            "device": device,
         },
         encode_kwargs={
             "normalize_embeddings": NORMALIZE_EMBEDDINGS,
         },
     )
-
 
 def build_vectorstore():
     embeddings = build_embeddings()

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { Send, Mic, Sparkles, GraduationCap, Calculator, Bot, User as UserIcon, Lock } from 'lucide-react';
-import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import api from '../lib/api';
 
 const ChatPage = () => {
   const { user } = useContext(AuthContext);
@@ -58,12 +58,12 @@ const ChatPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/v1/chat/', {
+      const response = await api.post('/api/v1/chat/', {
         message: textToSend,
         user_id: user.id.toString()
       });
       setMessages(prev => [...prev, { sender: 'bot', text: response.data.reply }]);
-    } catch (error) {
+    } catch {
       setMessages(prev => [...prev, { sender: 'bot', text: 'Xin lỗi, hệ thống máy chủ hiện không phản hồi.' }]);
     } finally {
       setIsLoading(false);

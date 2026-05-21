@@ -1,8 +1,7 @@
-import React, { useState, useContext } from 'react';
+import { useState, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, ArrowRight, Home } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 
 const LoginPage = () => {
@@ -13,7 +12,7 @@ const LoginPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   
-  const { login } = useContext(AuthContext);
+  const { login, register } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleAuthSubmit = async (e) => {
@@ -23,13 +22,10 @@ const LoginPage = () => {
     if (isLogin) {
       // Logic Đăng nhập
       try {
-        const response = await axios.post('http://localhost:8000/api/v1/auth/login', {
+        const authData = await login({
           email, password
         });
-        // Response trả về có dạng { access_token: "...", user: {...} }
-        login(response.data.user); // Lưu thông tin user vào Context
-        localStorage.setItem('uit_token', response.data.access_token);
-        if(response.data.user?.role === 'admin') navigate('/admin');
+        if(authData.user?.role === 'admin') navigate('/admin');
         else navigate('/chat');
       } catch (err) {
         const errorMessage = err.response?.data?.detail || 'Email hoặc mật khẩu không chính xác!';
@@ -42,11 +38,9 @@ const LoginPage = () => {
         return;
       }
       try {
-        const regResponse = await axios.post('http://localhost:8000/api/v1/auth/register', {
+        await register({
           name, email, password
         });
-        login(regResponse.data.user);
-        localStorage.setItem('uit_token', regResponse.data.access_token);
         navigate('/chat');
       } catch (err) {
         setError(err.response?.data?.detail || 'Lỗi đăng ký, vui lòng thử lại!');

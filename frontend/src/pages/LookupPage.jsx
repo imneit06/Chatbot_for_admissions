@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Search, BookOpen, DollarSign, Fingerprint, Info, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, BookOpen, DollarSign, Fingerprint, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import api from '../lib/api';
 
 const LookupPage = () => {
   const [majors, setMajors] = useState([]);
@@ -13,7 +13,7 @@ const LookupPage = () => {
   const fetchMajors = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.get('http://localhost:8000/api/v1/majors/');
+      const res = await api.get('/api/v1/majors/');
       setMajors(res.data);
     } catch (error) {
       console.error("Lỗi lấy dữ liệu tra cứu:", error);

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Calendar, Bot, User as UserIcon, Lock, RefreshCw, MessageSquareOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import api from '../lib/api';
 
 const HistoryPage = () => {
   const { user } = useContext(AuthContext);
@@ -18,7 +18,7 @@ const HistoryPage = () => {
       const timestamp = new Date().getTime();
       
       // 2. Gắn ?t=... vào URL kết hợp với cấu hình Headers
-      const res = await axios.get(`http://localhost:8000/api/v1/chat/history/${user.id}?t=${timestamp}`, {
+      const res = await api.get(`/api/v1/chat/history/${user.id}?t=${timestamp}`, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
