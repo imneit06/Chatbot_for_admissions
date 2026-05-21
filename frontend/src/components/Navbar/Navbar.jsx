@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bot, History, Search, LayoutDashboard, LogIn, LogOut } from 'lucide-react';
+import { Bot, History, Home, Search, LayoutDashboard, LogIn, LogOut } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 
 const Navbar = () => {
@@ -16,6 +16,7 @@ const Navbar = () => {
 
   // Lọc danh sách tab cơ bản
   const navItems = [
+    { path: '/', name: 'Trang chủ', icon: <Home className="w-4 h-4" />, activePaths: ['/', '/home'] },
     { path: '/chat', name: 'Chatbot', icon: <Bot className="w-4 h-4" /> },
     { path: '/lookup', name: 'Tra cứu', icon: <Search className="w-4 h-4" /> },
     { path: '/history', name: 'Lịch sử', icon: <History className="w-4 h-4" /> },
@@ -57,7 +58,7 @@ const Navbar = () => {
         {/* Navigation Items */}
         <div className="flex shrink-0 items-center gap-1 relative">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = item.activePaths?.includes(location.pathname) || location.pathname === item.path;
             return (
               <Link
                 key={item.path}

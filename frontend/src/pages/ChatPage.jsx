@@ -184,11 +184,12 @@ const ChatPage = () => {
   };
 
   useEffect(() => {
-    const prefillQuestion = location.state?.prefillQuestion;
+    const prefillQuestion = location.state?.prefillQuestion || localStorage.getItem('prefill_chat_message');
 
     if (!prefillQuestion) return;
 
     setInput(prefillQuestion);
+    localStorage.removeItem('prefill_chat_message');
     focusInput();
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.pathname, location.state, navigate]);
