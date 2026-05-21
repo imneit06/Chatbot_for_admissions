@@ -42,3 +42,4 @@ storage/chroma/*
 storage/*.pkl
 data/
 storage/
+/backend/uit_chatbot.db
