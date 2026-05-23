@@ -1,10 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+import logging
+
 from app.api import admin, auth, chat, knowledge, major
 from app.db.session import engine, Base, SessionLocal
 from app.models.user import User
 from app.core.security import get_password_hash
+from rag_app.core.config import RAG_WARMUP_ENABLED
+from rag_app.rag.chain import warm_up_llm
+from rag_app.rag.retriever import warm_up_retrieval
+
+logger = logging.getLogger(__name__)
 
 # Tạo bảng DB
 Base.metadata.create_all(bind=engine)
@@ -40,6 +47,24 @@ def create_default_admin():
         db.add(admin_user)
         db.commit()
     db.close()
+
+
+@app.on_event("startup")
+def warm_up_rag_components():
+    if RAG_WARMUP_ENABLED:
+        warmed = warm_up_retrieval()
+        if warmed:
+            logger.info("RAG retrieval components warmed up.")
+        else:
+            logger.info("RAG retrieval warm-up skipped or failed.")
+    else:
+        logger.info("RAG retrieval warm-up is disabled.")
+
+    try:
+        warm_up_llm()
+        logger.info("LLM client warmed up.")
+    except Exception:
+        logger.exception("LLM client warm-up failed.")
 # --------------------------------------------
 
 # Đăng ký Routers

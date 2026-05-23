@@ -139,6 +139,9 @@ RERANKER_ENABLED = get_bool("RERANKER_ENABLED", False)
 RERANKER_MODEL = get_env("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
 RERANKER_TOP_K = get_int("RERANKER_TOP_K", 5)
 
+# Warm-up
+RAG_WARMUP_ENABLED = get_bool("RAG_WARMUP_ENABLED", False)
+
 # Memory
 MEMORY_DIR = get_path("MEMORY_DIR", "storage/memory")
 MEMORY_MAX_RECENT_TURNS = get_int("MEMORY_MAX_RECENT_TURNS", 4)

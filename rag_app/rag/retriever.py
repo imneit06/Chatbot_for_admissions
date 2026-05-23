@@ -1,4 +1,6 @@
 import json
+import logging
+import time
 
 from langchain_core.documents import Document  
 from langchain_core.stores import InMemoryStore  
@@ -11,6 +13,7 @@ except Exception:
     from langchain_classic.retrievers.multi_vector import MultiVectorRetriever  
 
 from rag_app.core.config import (
+    CHILDREN_PATH,
     PARENTS_PATH,
     CHROMA_DIR,
     CHROMA_COLLECTION_NAME,
@@ -24,10 +27,26 @@ from rag_app.core.config import (
 from rag_app.rag.reranker import rerank
 from rag_app.search.bm25_index import get_bm25_indexer
 
+logger = logging.getLogger(__name__)
+
 # Module-level singletons
 _embeddings = None
 _vectorstore = None
 _docstore = None
+
+
+def elapsed_ms(start: float) -> float:
+    return (time.perf_counter() - start) * 1000
+
+
+def log_retrieval_timing(step: str, start: float, **extra):
+    extra_text = " ".join(f"{key}={value}" for key, value in extra.items())
+    logger.warning(
+        "[retriever timing] step=%s ms=%.1f %s",
+        step,
+        elapsed_ms(start),
+        extra_text,
+    )
 
 
 def get_embeddings():
@@ -49,6 +68,28 @@ def get_docstore():
     if _docstore is None:
         _docstore = load_parent_docstore()
     return _docstore
+
+
+def is_retrieval_index_ready() -> bool:
+    return PARENTS_PATH.exists() and CHILDREN_PATH.exists() and CHROMA_DIR.exists()
+
+
+def warm_up_retrieval() -> bool:
+    if not is_retrieval_index_ready():
+        logger.info("Skip retrieval warm-up because processed RAG index is not ready.")
+        return False
+
+    try:
+        get_embeddings()
+        get_vectorstore()
+        get_docstore()
+        get_bm25_indexer()
+    except Exception:
+        logger.exception("Retrieval warm-up failed.")
+        return False
+
+    logger.info("Retrieval warm-up completed.")
+    return True
 
 
 ID_KEY = "doc_id"
@@ -353,6 +394,17 @@ def retrieve_with_bm25(question: str, k: int = 20, doc_type: str = None) -> list
     return [doc_id for doc_id, _ in results if doc_id]
 
 
+def get_docs_by_ids(doc_ids: list[str], docstore=None) -> list:
+    if not doc_ids:
+        return []
+
+    if docstore is None:
+        docstore = get_docstore()
+
+    docs = docstore.mget(doc_ids)
+    return [doc for doc in docs if doc]
+
+
 def reciprocal_rank_fusion(
     ranked_lists: list[list[tuple[str, float]]],
     k: int = 60,
@@ -520,93 +572,147 @@ def ensure_plan_doc_type_coverage(docs: list, plans: list[dict]) -> list:
     
 
 def retrieve_docs(question: str, k: int = RETRIEVAL_TOP_K):
+    total_start = time.perf_counter()
+
+    step_start = time.perf_counter()
     plans = plan_queries(question)
+    log_retrieval_timing("plan_queries", step_start, plans=len(plans))
+
     candidate_k = max(k * 2, 10)
     plan_doc_groups = []
 
-    for plan in plans:
+    for plan_index, plan in enumerate(plans, start=1):
         plan_filter = metadata_filter_from_plan(plan)
 
         # Chroma vector search
         plan_doc_type = plan.get("doc_type")
+
+        step_start = time.perf_counter()
         chroma_retriever = build_retriever(metadata_filter=plan_filter, k=candidate_k)
+        log_retrieval_timing(
+            "build_chroma_retriever",
+            step_start,
+            plan=plan_index,
+            doc_type=plan_doc_type,
+        )
+
+        step_start = time.perf_counter()
         chroma_docs = chroma_retriever.invoke(plan["query"])
+        log_retrieval_timing(
+            "chroma_search",
+            step_start,
+            plan=plan_index,
+            doc_type=plan_doc_type,
+            docs=len(chroma_docs),
+        )
 
         # BM25 keyword search (filtered by doc_type)
+        step_start = time.perf_counter()
         bm25_raw = retrieve_with_bm25(plan["query"], k=candidate_k, doc_type=plan_doc_type)
-        docstore = get_docstore()
-        bm25_docs = []
-        for doc_id in bm25_raw:
-            doc = docstore.mget([doc_id])
-            if doc and doc[0]:
-                bm25_docs.append(doc[0])
+        log_retrieval_timing(
+            "bm25_search",
+            step_start,
+            plan=plan_index,
+            doc_type=plan_doc_type,
+            ids=len(bm25_raw),
+        )
+
+        step_start = time.perf_counter()
+        bm25_docs = get_docs_by_ids(bm25_raw)
+        log_retrieval_timing(
+            "docstore_mget",
+            step_start,
+            plan=plan_index,
+            docs=len(bm25_docs),
+        )
 
         # RRF fusion: merge chroma + bm25
+        step_start = time.perf_counter()
         fused = _fuse_docs_by_rrf([chroma_docs, bm25_docs], top_k=candidate_k)
+        log_retrieval_timing("rrf_fuse_plan", step_start, plan=plan_index, docs=len(fused))
         plan_doc_groups.append(fused)
 
     if is_total_credit_query(question):
         focused_query = build_total_credit_focus_query(question)
         focused_filter = metadata_filter_from_plan({"doc_type": "curriculum"})
 
+        step_start = time.perf_counter()
         chroma_retriever = build_retriever(
             metadata_filter=focused_filter,
             k=candidate_k,
         )
-        chroma_docs = chroma_retriever.invoke(focused_query)
+        log_retrieval_timing("build_focused_chroma_retriever", step_start)
 
+        step_start = time.perf_counter()
+        chroma_docs = chroma_retriever.invoke(focused_query)
+        log_retrieval_timing("focused_chroma_search", step_start, docs=len(chroma_docs))
+
+        step_start = time.perf_counter()
         bm25_raw = retrieve_with_bm25(
             focused_query,
             k=candidate_k,
             doc_type="curriculum",
         )
+        log_retrieval_timing("focused_bm25_search", step_start, ids=len(bm25_raw))
 
-        docstore = get_docstore()
-        bm25_docs = []
+        step_start = time.perf_counter()
+        bm25_docs = get_docs_by_ids(bm25_raw)
+        log_retrieval_timing("focused_docstore_mget", step_start, docs=len(bm25_docs))
 
-        for doc_id in bm25_raw:
-            doc = docstore.mget([doc_id])
-            if doc and doc[0]:
-                bm25_docs.append(doc[0])
-
+        step_start = time.perf_counter()
         focused_fused = _fuse_docs_by_rrf(
             [chroma_docs, bm25_docs],
             top_k=candidate_k,
         )
+        log_retrieval_timing("focused_rrf_fuse", step_start, docs=len(focused_fused))
         plan_doc_groups.append(focused_fused)
 
-    needs_broad_retrieval = (
-    len(plans) > 1
-    or any(plan.get("doc_type") is None for plan in plans)
-)
+    needs_broad_retrieval = len(plans) > 1
 
     if needs_broad_retrieval:
         broad_query = build_rerank_query(question, plans)
+
+        step_start = time.perf_counter()
         chroma_broad = build_retriever(metadata_filter=None, k=candidate_k).invoke(broad_query)
+        log_retrieval_timing("broad_chroma_search", step_start, docs=len(chroma_broad))
+
+        step_start = time.perf_counter()
         bm25_broad_raw = retrieve_with_bm25(broad_query, k=candidate_k)
+        log_retrieval_timing("broad_bm25_search", step_start, ids=len(bm25_broad_raw))
 
-        docstore = get_docstore()
-        bm25_broad_docs = []
-        for doc_id in bm25_broad_raw:
-            doc = docstore.mget([doc_id])
-            if doc and doc[0]:
-                bm25_broad_docs.append(doc[0])
+        step_start = time.perf_counter()
+        bm25_broad_docs = get_docs_by_ids(bm25_broad_raw)
+        log_retrieval_timing("broad_docstore_mget", step_start, docs=len(bm25_broad_docs))
 
+        step_start = time.perf_counter()
         broad_fused = _fuse_docs_by_rrf([chroma_broad, bm25_broad_docs], top_k=candidate_k)
+        log_retrieval_timing("broad_rrf_fuse", step_start, docs=len(broad_fused))
         plan_doc_groups.append(broad_fused)
 
     candidate_k = max(k * 2, 10)
+
+    step_start = time.perf_counter()
     candidates = _fuse_docs_by_rrf(plan_doc_groups, top_k=candidate_k)
+    log_retrieval_timing("rrf_fuse_all", step_start, docs=len(candidates))
+
     rerank_query = build_rerank_query(question, plans)
 
     if RERANKER_ENABLED:
+        step_start = time.perf_counter()
         reranked_docs = rerank(rerank_query, candidates, top_k=candidate_k)
+        log_retrieval_timing("rerank", step_start, docs=len(reranked_docs))
+
+        step_start = time.perf_counter()
         reranked_docs = boost_total_credit_docs(reranked_docs, question)
         merged_docs = ensure_plan_doc_type_coverage(reranked_docs, plans)[:k]
+        log_retrieval_timing("postprocess_docs", step_start, docs=len(merged_docs))
     else:
+        step_start = time.perf_counter()
         candidates = boost_total_credit_docs(candidates, question)
         merged_docs = ensure_plan_doc_type_coverage(candidates, plans)[:k]
+        log_retrieval_timing("postprocess_docs", step_start, docs=len(merged_docs))
 
+    log_retrieval_timing("total", total_start, docs=len(merged_docs))
     return merged_docs, {"plans": plans}
     
 
@@ -624,6 +730,13 @@ def _format_meta_line(label: str, value):
         return None
     return f"{label}: {value}"
 
+def trim_text(text, max_chars):
+    text = (text or "").strip()
+
+    if len(text) <= max_chars:
+        return text
+
+    return text[:max_chars].rstrip() + "\n...[đã rút gọn]"
 
 def format_context(docs):
     blocks = []
@@ -631,38 +744,28 @@ def format_context(docs):
     for i, doc in enumerate(docs, start=1):
         meta = doc.metadata or {}
 
-        source = meta.get("source", "unknown")
-        source_title = meta.get("source_title")
-        location = meta.get("location")
-        parent_type = meta.get("parent_type")
-        file_type = meta.get("file_type")
-        doc_type = meta.get("doc_type")
-        source_year = meta.get("source_year")
-        page = meta.get("page")
-        major_name = meta.get("major_name")
-        section_title = meta.get("section_title")
-        section_index = meta.get("section_index")
-        table_index = meta.get("table_index")
-        image_index = meta.get("image_index")
-
+        # Chỉ lấy metadata quan trọng
         meta_lines = [
-            _format_meta_line("Nguồn file", source),
-            _format_meta_line("Tên nguồn", source_title),
-            _format_meta_line("Loại file", file_type),
-            _format_meta_line("Loại tài liệu", doc_type),
-            _format_meta_line("Năm nguồn", source_year),
-            _format_meta_line("Trang", page),
-            _format_meta_line("Vị trí", location),
-            _format_meta_line("Loại parent", parent_type),
-            _format_meta_line("Ngành", major_name),
-            _format_meta_line("Mục", section_title),
-            _format_meta_line("Section index", section_index),
-            _format_meta_line("Table index", table_index),
-            _format_meta_line("Image index", image_index),
+            _format_meta_line("Tên nguồn", meta.get("source_title")),
+            _format_meta_line("Loại tài liệu", meta.get("doc_type")),
+            _format_meta_line("Năm nguồn", meta.get("source_year")),
+            _format_meta_line("Trang", meta.get("page")),
+            _format_meta_line("Ngành", meta.get("major_name")),
+            _format_meta_line("Mục", meta.get("section_title")),
         ]
 
-        meta_text = "\n".join(line for line in meta_lines if line)
 
+        meta_text = "\n".join(line for line in meta_lines if line)
+        # Doc đầu giữ dài hơn
+        if i == 1:
+            max_chars = 2200
+        elif i <= 3:
+            max_chars = 1600
+        else:
+            max_chars = 1000
+
+        content = trim_text(doc.page_content, max_chars)
+        
         block = f"""[DOCUMENT {i}]
 {meta_text}
 

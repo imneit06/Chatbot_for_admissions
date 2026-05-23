@@ -1,3 +1,6 @@
+import logging
+import time
+
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from rag_app.core.config import (
@@ -18,14 +21,43 @@ from rag_app.rag.retriever import retrieve_docs, format_context, format_sources
 from rag_app.rag.memory import FileChatMemoryStore, format_messages
 
 
+logger = logging.getLogger(__name__)
 memory_store = FileChatMemoryStore()
+_llm = None
+
+
+def elapsed_ms(start: float) -> float:
+    return (time.perf_counter() - start) * 1000
+
+
+def log_timing(session_id: str, step: str, start: float, **extra):
+    extra_text = " ".join(f"{key}={value}" for key, value in extra.items())
+    logger.warning(
+        "[RAG timing] session=%s step=%s ms=%.1f %s",
+        session_id,
+        step,
+        elapsed_ms(start),
+        extra_text,
+    )
 
 
 def build_llm():
-    return ChatGoogleGenerativeAI(
-        model=GEMINI_MODEL,
-        temperature=LLM_TEMPERATURE,
-    )
+    global _llm
+    if _llm is None:
+        _llm = ChatGoogleGenerativeAI(
+            model=GEMINI_MODEL,
+            temperature=LLM_TEMPERATURE,
+        )
+    return _llm
+
+
+def warm_up_llm():
+    build_llm()
+
+
+def clear_llm_cache():
+    global _llm
+    _llm = None
 
 
 def should_rewrite_question(question: str, session: dict) -> bool:
@@ -159,19 +191,42 @@ def answer_question(
     6. Summarize memory nếu history dài
     """
 
+    total_start = time.perf_counter()
+
+    step_start = time.perf_counter()
     standalone_question = rewrite_question(
         question=question,
         session_id=session_id,
     )
+    log_timing(
+        session_id,
+        "rewrite_question",
+        step_start,
+        changed=standalone_question != question,
+    )
 
+    step_start = time.perf_counter()
     docs, metadata_filter = retrieve_docs(
         standalone_question,
         k=RETRIEVAL_TOP_K,
     )
+    log_timing(session_id, "retrieve_docs", step_start, docs=len(docs))
 
+    step_start = time.perf_counter()
     context = format_context(docs)
-    memory_summary, recent_chat_history = memory_store.get_memory_parts(session_id)
+    log_timing(session_id, "format_context", step_start, context_chars=len(context))
 
+    step_start = time.perf_counter()
+    memory_summary, recent_chat_history = memory_store.get_memory_parts(session_id)
+    log_timing(
+        session_id,
+        "load_memory",
+        step_start,
+        summary_chars=len(memory_summary),
+        history_chars=len(recent_chat_history),
+    )
+
+    step_start = time.perf_counter()
     prompt = (
         SYSTEM_PROMPT
         + "\n\n"
@@ -183,12 +238,19 @@ def answer_question(
             standalone_question=standalone_question,
         )
     )
+    log_timing(session_id, "build_prompt", step_start, prompt_chars=len(prompt))
 
+    step_start = time.perf_counter()
     llm = build_llm()
+    log_timing(session_id, "get_llm", step_start)
+
+    step_start = time.perf_counter()
     response = llm.invoke(prompt)
+    log_timing(session_id, "gemini_generate", step_start)
 
     answer = response.content
 
+    step_start = time.perf_counter()
     memory_store.append_message(
         session_id=session_id,
         role="user",
@@ -200,8 +262,12 @@ def answer_question(
         role="assistant",
         content=answer,
     )
+    log_timing(session_id, "save_memory", step_start, answer_chars=len(answer))
 
+    step_start = time.perf_counter()
     maybe_summarize_memory(session_id)
+    log_timing(session_id, "maybe_summarize_memory", step_start)
+    log_timing(session_id, "total", total_start)
 
     return {
         "answer": answer,
