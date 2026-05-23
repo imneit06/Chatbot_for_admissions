@@ -45,13 +45,20 @@ const getChatErrorMessage = (error) => {
   return 'Xin lỗi, hệ thống máy chủ hiện không phản hồi.';
 };
 
-const getSourceTitle = (source) => (
-  source.title
-  || source.source_title
-  || source.file
-  || source.source
-  || 'Nguồn tham khảo'
-);
+const getSourceTitle = (source) => {
+  if (source.title || source.source_title) {
+    return source.title || source.source_title;
+  }
+
+  const rawSource = source.file || source.source || '';
+  const fileName = rawSource.split(/[\\/]/).pop();
+
+  if (!fileName) {
+    return 'Nguồn tham khảo';
+  }
+
+  return fileName.replace(/\.[^/.]+$/, '').replaceAll('_', ' ');
+};
 
 const ChatPage = () => {
   const { user } = useContext(AuthContext);
@@ -383,9 +390,6 @@ const ChatPage = () => {
                           {msg.sources.map((source, index) => (
                             <div key={`${msg.id}-source-${index}`} className="rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
                               <p className="font-bold text-gray-800">{getSourceTitle(source)}</p>
-                              {(source.file || source.source) && (
-                                <p className="mt-1">File: {source.file || source.source}</p>
-                              )}
                               {source.page && <p>Trang: {source.page}</p>}
                               {source.score && <p>Score: {source.score}</p>}
                             </div>

@@ -59,6 +59,7 @@ Yêu cầu khi trả lời:
 - Không trộn "môn xét tuyển" với "tổ hợp xét tuyển".
 - Nếu CONTEXT không có đủ thông tin cho một ý nào đó, hãy nói rõ ý đó chưa tìm thấy thông tin.
 - Chỉ ghi nguồn là các DOCUMENT thật sự được dùng để trả lời.
+- Không sử dụng Markdown trong câu trả lời. Không dùng dấu *, **, bullet Markdown. Nếu cần liệt kê, dùng dấu gạch ngang "-" hoặc đánh số 1., 2., 3. Trả lời bằng văn bản thuần, rõ ràng, dễ đọc.
 """
 
 REWRITE_PROMPT_TEMPLATE = """
