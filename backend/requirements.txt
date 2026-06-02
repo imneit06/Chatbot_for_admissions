@@ -8,6 +8,7 @@ PyJWT==2.8.0
 bcrypt==4.1.2
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
+python-multipart==0.0.9
 
 # RAG / LangChain
 langchain==0.3.8

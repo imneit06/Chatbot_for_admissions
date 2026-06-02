@@ -1,6 +1,5 @@
 from pathlib import Path
 import json
-import shutil
 import sys
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -128,6 +127,21 @@ def build_vectorstore():
     return vectorstore
 
 
+def reset_chroma_collection():
+    CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+
+    vectorstore = build_vectorstore()
+    try:
+        vectorstore.delete_collection()
+        print(f"Đã xóa collection Chroma: {CHROMA_COLLECTION_NAME}")
+    except Exception as exc:
+        message = str(exc).lower()
+        if "does not exist" in message or "not found" in message:
+            print(f"Collection Chroma chưa tồn tại: {CHROMA_COLLECTION_NAME}")
+        else:
+            raise
+
+
 def build_retriever(vectorstore, docstore, metadata_filter=None, k=6):
     search_kwargs = {
         "k": k,
@@ -176,10 +190,10 @@ def add_documents_with_fallback(vectorstore, documents):
         
 
 def ingest():
-    if RESET_INDEX and CHROMA_DIR.exists():
-        shutil.rmtree(CHROMA_DIR)
-
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+
+    if RESET_INDEX:
+        reset_chroma_collection()
 
     parents = load_parents()
     children = load_children()

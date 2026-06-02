@@ -26,6 +26,7 @@ router = APIRouter()
 
 ALLOWED_EXTENSIONS = {".pdf", ".html", ".htm", ".txt", ".md"}
 TEXT_EXTENSIONS = {".txt", ".md"}
+PROCESSING_STATUSES = {"uploaded", "processing"}
 
 
 def sanitize_filename(filename: str) -> str:
@@ -53,6 +54,24 @@ def get_destination(original_filename: str) -> tuple[str, str, Path]:
         return "html", f"{unique_stem}.html", HTML_RAW_DIR / f"{unique_stem}.html"
 
     return extension.lstrip("."), f"{unique_stem}.html", HTML_RAW_DIR / f"{unique_stem}.html"
+
+
+def remove_document_files(document: KnowledgeDocument):
+    paths = [Path(document.file_path)]
+
+    if document.file_type in {"txt", "md"}:
+        paths.append(TEXT_RAW_DIR / f"{Path(document.filename).stem}.{document.file_type}")
+
+    allowed_roots = [
+        PDF_RAW_DIR.resolve(),
+        HTML_RAW_DIR.resolve(),
+        TEXT_RAW_DIR.resolve(),
+    ]
+
+    for file_path in paths:
+        resolved_file = file_path.resolve()
+        if any(resolved_file.is_relative_to(root) for root in allowed_roots) and resolved_file.exists():
+            resolved_file.unlink()
 
 
 @router.get("/documents", response_model=list[KnowledgeDocumentResponse])
@@ -104,7 +123,7 @@ async def upload_document(
         file_path=str(destination),
         file_type=file_type,
         source_type="upload",
-        status="uploaded",
+        status="processing",
         uploaded_by=current_admin.id,
     )
 
@@ -129,9 +148,12 @@ def reindex_document(
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu tri thức.")
 
     if document.status == "deleted":
-        raise HTTPException(status_code=400, detail="Không thể re-index tài liệu đã xóa.")
+        raise HTTPException(status_code=400, detail="Không thể cập nhật lại tài liệu đã xóa.")
 
-    document.status = "uploaded"
+    if document.status in PROCESSING_STATUSES:
+        raise HTTPException(status_code=400, detail="Tài liệu này đang được xử lý.")
+
+    document.status = "processing"
     document.error_message = None
     document.updated_at = datetime.utcnow()
     db.commit()
@@ -153,17 +175,8 @@ def delete_document(
     if not document:
         raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu tri thức.")
 
-    file_path = Path(document.file_path)
     try:
-        resolved_file = file_path.resolve()
-        allowed_roots = [
-            PDF_RAW_DIR.resolve(),
-            HTML_RAW_DIR.resolve(),
-            TEXT_RAW_DIR.resolve(),
-        ]
-
-        if any(resolved_file.is_relative_to(root) for root in allowed_roots) and resolved_file.exists():
-            resolved_file.unlink()
+        remove_document_files(document)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể xóa file vật lý: {exc}")
 
@@ -171,10 +184,9 @@ def delete_document(
     document.updated_at = datetime.utcnow()
     db.commit()
 
-    # Chroma delete granular chưa làm ở phase này; rebuild full index là hướng an toàn.
     background_tasks.add_task(run_knowledge_rebuild_after_delete, document.id)
 
-    return {"message": "Đã đánh dấu tài liệu là deleted và trigger rebuild index."}
+    return {"message": "Đã xóa tài liệu khỏi kho tri thức."}
 
 
 @router.get("/status", response_model=KnowledgeStatusResponse)

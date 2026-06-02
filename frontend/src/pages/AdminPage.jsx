@@ -495,6 +495,16 @@ const knowledgeStatusStyles = {
   deleted: 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
+const knowledgeStatusLabels = {
+  uploaded: 'Chờ xử lý',
+  processing: 'Đang xử lý',
+  indexed: 'Sẵn sàng',
+  failed: 'Lỗi',
+  deleted: 'Đã xóa',
+};
+
+const activeKnowledgeStatuses = ['uploaded', 'processing'];
+
 const allowedKnowledgeExtensions = ['pdf', 'html', 'htm', 'txt', 'md'];
 
 const KnowledgeTab = () => {
@@ -537,9 +547,9 @@ const KnowledgeTab = () => {
   }, []);
 
   useEffect(() => {
-    const hasProcessingDocument = documents.some((doc) => doc.status === 'processing');
+    const hasActiveDocument = documents.some((doc) => activeKnowledgeStatuses.includes(doc.status));
 
-    if (!hasProcessingDocument) return undefined;
+    if (!hasActiveDocument) return undefined;
 
     const intervalId = window.setInterval(fetchKnowledgeData, 4000);
     return () => window.clearInterval(intervalId);
@@ -574,10 +584,10 @@ const KnowledgeTab = () => {
       await api.post('/api/v1/knowledge/upload', formData);
       setSelectedFile(null);
       event.target.reset();
-      showKnowledgeToast('success', 'Upload thành công. Backend đang cập nhật RAG index.');
+      showKnowledgeToast('success', 'Tải tài liệu thành công. Hệ thống đang cập nhật kho tri thức.');
       await fetchKnowledgeData();
     } catch (error) {
-      setKnowledgeError(error.response?.data?.detail || 'Upload thất bại. Vui lòng thử lại.');
+      setKnowledgeError(error.response?.data?.detail || 'Tải lên thất bại. Vui lòng thử lại.');
     } finally {
       setIsUploading(false);
     }
@@ -589,10 +599,10 @@ const KnowledgeTab = () => {
 
     try {
       await api.post(`/api/v1/knowledge/documents/${document.id}/reindex`);
-      showKnowledgeToast('success', 'Đã trigger re-index tài liệu.');
+      showKnowledgeToast('success', 'Đã bắt đầu cập nhật lại tài liệu.');
       await fetchKnowledgeData();
     } catch (error) {
-      setKnowledgeError(error.response?.data?.detail || 'Không thể re-index tài liệu này.');
+      setKnowledgeError(error.response?.data?.detail || 'Không thể cập nhật lại tài liệu này.');
     } finally {
       setActionLoadingId(null);
     }
@@ -607,7 +617,7 @@ const KnowledgeTab = () => {
     try {
       await api.delete(`/api/v1/knowledge/documents/${deleteTarget.id}`);
       setDeleteTarget(null);
-      showKnowledgeToast('success', 'Đã xóa tài liệu và trigger rebuild index.');
+      showKnowledgeToast('success', 'Đã xóa tài liệu khỏi kho tri thức.');
       await fetchKnowledgeData();
     } catch (error) {
       setKnowledgeError(error.response?.data?.detail || 'Không thể xóa tài liệu này.');
@@ -618,11 +628,11 @@ const KnowledgeTab = () => {
 
   const summaryCards = [
     { label: 'Tổng', value: summary?.total ?? 0 },
-    { label: 'Indexed', value: summary?.indexed ?? 0 },
-    { label: 'Processing', value: summary?.processing ?? 0 },
-    { label: 'Failed', value: summary?.failed ?? 0 },
-    { label: 'Uploaded', value: summary?.uploaded ?? 0 },
-    { label: 'Deleted', value: summary?.deleted ?? 0 },
+    { label: 'Sẵn sàng', value: summary?.indexed ?? 0 },
+    { label: 'Đang xử lý', value: summary?.processing ?? 0 },
+    { label: 'Lỗi', value: summary?.failed ?? 0 },
+    { label: 'Chờ xử lý', value: summary?.uploaded ?? 0 },
+    { label: 'Đã xóa', value: summary?.deleted ?? 0 },
   ];
 
   return (
@@ -630,7 +640,7 @@ const KnowledgeTab = () => {
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold text-gray-800">Quản lý Tài liệu Tri thức</h2>
-          <p className="mt-1 text-sm text-gray-500">Upload PDF/HTML/TXT/MD để backend lưu file và chạy prepare/ingest ngầm.</p>
+          <p className="mt-1 text-sm text-gray-500">Tải lên PDF/HTML/TXT/MD để hệ thống xử lý và đưa vào kho tri thức.</p>
 
           <form onSubmit={handleUpload} className="mt-5 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4">
             <label className="block text-sm font-bold text-gray-700">
@@ -644,7 +654,7 @@ const KnowledgeTab = () => {
             </label>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs font-semibold text-gray-500">
-                TXT/MD sẽ được convert sang HTML đơn giản để dùng pipeline hiện tại.
+                TXT/MD sẽ được chuyển đổi tự động để hệ thống có thể xử lý.
               </p>
               <button
                 type="submit"
@@ -652,7 +662,7 @@ const KnowledgeTab = () => {
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#003366] px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
               >
                 <Upload className="h-4 w-4" />
-                {isUploading ? 'Đang upload...' : 'Upload'}
+                {isUploading ? 'Đang tải lên...' : 'Tải lên'}
               </button>
             </div>
           </form>
@@ -661,8 +671,8 @@ const KnowledgeTab = () => {
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-black text-gray-900">Trạng thái index</h3>
-              <p className="text-sm text-gray-500">Tự refresh khi có tài liệu processing.</p>
+              <h3 className="text-lg font-black text-gray-900">Trạng thái kho tri thức</h3>
+              <p className="text-sm text-gray-500">Tự cập nhật khi có tài liệu đang xử lý.</p>
             </div>
             <button
               type="button"
@@ -702,14 +712,10 @@ const KnowledgeTab = () => {
         </div>
       )}
 
-      <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-        Phase này rebuild full index từ raw documents. Incremental indexing và Chroma delete granular để phase sau.
-      </div>
-
       <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">
           <h3 className="text-lg font-black text-gray-900">Danh sách tài liệu</h3>
-          <p className="text-sm text-gray-500">Theo dõi trạng thái ingest và lỗi nếu có.</p>
+          <p className="text-sm text-gray-500">Theo dõi quá trình xử lý và lỗi nếu có.</p>
         </div>
 
         {isLoadingDocs && documents.length === 0 ? (
@@ -720,20 +726,20 @@ const KnowledgeTab = () => {
               <FileText className="h-7 w-7" />
             </div>
             <p className="font-bold text-gray-700">Chưa có tài liệu tri thức</p>
-            <p className="mt-1 text-sm text-gray-500">Upload file đầu tiên để backend chạy prepare/ingest.</p>
+            <p className="mt-1 text-sm text-gray-500">Tải lên tài liệu đầu tiên để bắt đầu xây dựng kho tri thức.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left">
               <thead className="bg-gray-50 text-xs font-black uppercase text-gray-500">
                 <tr>
-                  <th className="px-6 py-4">File name</th>
-                  <th className="px-6 py-4">Type</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Uploaded at</th>
-                  <th className="px-6 py-4">Indexed at</th>
-                  <th className="px-6 py-4">Error</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="px-6 py-4">Tên tài liệu</th>
+                  <th className="px-6 py-4">Định dạng</th>
+                  <th className="px-6 py-4">Trạng thái</th>
+                  <th className="px-6 py-4">Ngày tải lên</th>
+                  <th className="px-6 py-4">Ngày cập nhật</th>
+                  <th className="px-6 py-4">Lỗi</th>
+                  <th className="px-6 py-4 text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
@@ -752,11 +758,11 @@ const KnowledgeTab = () => {
                       <td className="px-6 py-4 font-bold uppercase text-gray-500">{document.file_type}</td>
                       <td className="px-6 py-4">
                         <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase ${knowledgeStatusStyles[document.status] || knowledgeStatusStyles.uploaded}`}>
-                          {document.status}
+                          {knowledgeStatusLabels[document.status] || document.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-500">{formatDateTime(document.created_at)}</td>
-                      <td className="px-6 py-4 text-gray-500">{document.indexed_at ? formatDateTime(document.indexed_at) : 'Chưa index'}</td>
+                      <td className="px-6 py-4 text-gray-500">{document.indexed_at ? formatDateTime(document.indexed_at) : 'Chưa cập nhật'}</td>
                       <td className="px-6 py-4">
                         {document.error_message ? (
                           <button
@@ -765,7 +771,7 @@ const KnowledgeTab = () => {
                             className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100"
                           >
                             <Eye className="h-3.5 w-3.5" />
-                            View error
+                            Xem lỗi
                           </button>
                         ) : (
                           <span className="text-gray-300">-</span>
@@ -780,7 +786,7 @@ const KnowledgeTab = () => {
                             className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <RefreshCw className={`h-3.5 w-3.5 ${document.status === 'processing' ? 'animate-spin' : ''}`} />
-                            Re-index
+                            Cập nhật lại
                           </button>
                           <button
                             type="button"
@@ -789,7 +795,7 @@ const KnowledgeTab = () => {
                             className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
-                            Delete
+                            Xóa
                           </button>
                         </div>
                       </td>
@@ -807,7 +813,7 @@ const KnowledgeTab = () => {
           <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-black text-gray-900">Ingest error</h3>
+                <h3 className="text-xl font-black text-gray-900">Chi tiết lỗi xử lý</h3>
                 <p className="text-sm text-gray-500">{errorTarget.original_filename}</p>
               </div>
               <button type="button" onClick={() => setErrorTarget(null)} className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200" aria-label="Đóng lỗi">
@@ -826,7 +832,7 @@ const KnowledgeTab = () => {
               <div>
                 <h3 className="text-xl font-black text-gray-900">Xóa tài liệu?</h3>
                 <p className="mt-2 text-sm text-gray-500">
-                  File <span className="font-bold text-gray-700">{deleteTarget.original_filename}</span> sẽ được đánh dấu deleted và rebuild full index.
+                  Tài liệu <span className="font-bold text-gray-700">{deleteTarget.original_filename}</span> sẽ bị xóa khỏi kho tri thức.
                 </p>
               </div>
               <button type="button" onClick={() => setDeleteTarget(null)} className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200" aria-label="Đóng xác nhận xóa">

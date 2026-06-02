@@ -25,7 +25,7 @@ from rag_app.core.config import (
 )
 
 from rag_app.rag.reranker import rerank
-from rag_app.search.bm25_index import get_bm25_indexer
+from rag_app.search.bm25_index import get_bm25_indexer, reset_bm25_indexer
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,15 @@ def get_docstore():
     if _docstore is None:
         _docstore = load_parent_docstore()
     return _docstore
+
+
+def reset_retrieval_cache(reset_bm25: bool = True):
+    global _vectorstore, _docstore
+    _vectorstore = None
+    _docstore = None
+
+    if reset_bm25:
+        reset_bm25_indexer()
 
 
 def is_retrieval_index_ready() -> bool:
