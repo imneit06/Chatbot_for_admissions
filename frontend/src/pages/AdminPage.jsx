@@ -958,10 +958,6 @@ const AdminPage = () => {
             <h1 className="text-3xl font-black text-[#003366] uppercase">Admin Dashboard</h1>
             <p className="text-gray-500">Quản lý tri thức và người dùng hệ thống UIT</p>
           </div>
-          <button className="flex items-center gap-2 px-6 py-3 bg-[#0ea5e9] text-white rounded-2xl font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95">
-            <Plus className="w-5 h-5" />
-            Thêm mới
-          </button>
         </header>
 
         {/* Tab Navigation */}
