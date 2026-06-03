@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar/Navbar';
+import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
 import LookupPage from './pages/LookupPage';
 import AdminPage from './pages/AdminPage';
@@ -20,7 +21,7 @@ function App() {
         <main className="flex-1">
           <ErrorBoundary>
             <Routes>
-              <Route path="/" element={<Navigate to={isAuthenticated ? '/chat' : '/login'} replace />} />
+              <Route path="/" element={<LandingPage />} />
               <Route path="/lookup" element={<LookupPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route element={<ProtectedRoute />}>
@@ -30,7 +31,7 @@ function App() {
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminPage />} />
               </Route>
-              <Route path="*" element={<Navigate to={isAuthenticated ? '/chat' : '/login'} replace />} />
+              <Route path="*" element={<Navigate to={isAuthenticated ? '/chat' : '/'} replace />} />
             </Routes>
           </ErrorBoundary>
         </main>

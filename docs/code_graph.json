@@ -1,0 +1,332 @@
+{
+  "version": "1.0",
+  "system": "UIT admissions RAG chatbot",
+  "nodes": [
+    {
+      "id": "frontend.app",
+      "type": "frontend_router",
+      "path": "frontend/src/App.jsx",
+      "responsibility": "Defines React routes and protected/admin route boundaries."
+    },
+    {
+      "id": "frontend.api",
+      "type": "frontend_api_client",
+      "path": "frontend/src/lib/api.js",
+      "responsibility": "Axios API client with VITE_API_URL, bearer token injection, and 401/403 redirect handling."
+    },
+    {
+      "id": "frontend.chat",
+      "type": "frontend_page",
+      "path": "frontend/src/pages/ChatPage.jsx",
+      "responsibility": "Chat composer, message state, suggested questions, answer/source rendering, copy and regenerate actions."
+    },
+    {
+      "id": "frontend.admin",
+      "type": "frontend_page",
+      "path": "frontend/src/pages/AdminPage.jsx",
+      "responsibility": "Admin dashboard for stats, users, majors, and knowledge upload/reindex/delete/status polling."
+    },
+    {
+      "id": "backend.main",
+      "type": "fastapi_app",
+      "path": "backend/app/main.py",
+      "responsibility": "Creates tables, seeds default admin, warms RAG components, and registers API routers."
+    },
+    {
+      "id": "backend.chat_route",
+      "type": "api_route",
+      "path": "backend/app/api/chat.py",
+      "endpoints": [
+        "POST /api/v1/chat/",
+        "GET /api/v1/chat/history/{user_id}",
+        "DELETE /api/v1/chat/history/item/{history_id}"
+      ],
+      "responsibility": "Receives chat requests, invokes RAG chain, saves chat history, and handles fallback responses."
+    },
+    {
+      "id": "backend.knowledge_route",
+      "type": "api_route",
+      "path": "backend/app/api/knowledge.py",
+      "endpoints": [
+        "GET /api/v1/knowledge/documents",
+        "POST /api/v1/knowledge/upload",
+        "POST /api/v1/knowledge/documents/{document_id}/reindex",
+        "DELETE /api/v1/knowledge/documents/{document_id}",
+        "GET /api/v1/knowledge/status"
+      ],
+      "responsibility": "Admin-only knowledge document management and ingestion task scheduling."
+    },
+    {
+      "id": "backend.ingest_service",
+      "type": "service",
+      "path": "backend/app/services/knowledge_ingest_service.py",
+      "responsibility": "Coordinates serialized full RAG rebuild, Chroma ingest, BM25 rebuild, cache reset, and KnowledgeDocument status updates."
+    },
+    {
+      "id": "rag.chain",
+      "type": "rag_chain",
+      "path": "rag_app/rag/chain.py",
+      "responsibility": "Rewrites follow-up questions, retrieves docs, builds prompt, calls Gemini, persists memory, and returns answer/sources."
+    },
+    {
+      "id": "rag.retriever",
+      "type": "retriever",
+      "path": "rag_app/rag/retriever.py",
+      "responsibility": "Hybrid retrieval using Chroma semantic search, BM25 keyword search, RRF fusion, optional reranking, and source/context formatting."
+    },
+    {
+      "id": "rag.memory",
+      "type": "memory_store",
+      "path": "rag_app/rag/memory.py",
+      "storage": "storage/memory/*.json",
+      "responsibility": "File-backed session memory for rewrite, recent history, and memory summarization."
+    },
+    {
+      "id": "rag.prompts",
+      "type": "prompt_templates",
+      "path": "rag_app/core/prompts.py",
+      "responsibility": "Context-only system prompt, RAG answer prompt, rewrite prompt, and memory summary prompt."
+    },
+    {
+      "id": "rag.config",
+      "type": "configuration",
+      "path": "rag_app/core/config.py",
+      "responsibility": "Loads .env and exposes LLM, embedding, path, Chroma, chunking, retrieval, reranker, warm-up, and memory settings."
+    },
+    {
+      "id": "index.pipeline",
+      "type": "indexing_pipeline",
+      "path": "rag_app/indexing/pipeline.py",
+      "responsibility": "Processes raw PDFs/HTMLs into parent JSONL records and child JSONL records."
+    },
+    {
+      "id": "index.text_chunker",
+      "type": "chunker",
+      "path": "rag_app/chunking/text_chunker.py",
+      "responsibility": "Splits text with RecursiveCharacterTextSplitter and tags chunk quality."
+    },
+    {
+      "id": "index.table_chunker",
+      "type": "chunker",
+      "path": "rag_app/chunking/table_chunker.py",
+      "responsibility": "Creates table summaries and grouped table-row child documents."
+    },
+    {
+      "id": "index.image_chunker",
+      "type": "chunker",
+      "path": "rag_app/chunking/image_chunker.py",
+      "responsibility": "Creates image metadata and OCR child documents for relevant images."
+    },
+    {
+      "id": "index.vector_ingest",
+      "type": "vector_ingestion",
+      "path": "scripts/ingest_multivector.py",
+      "responsibility": "Loads JSONL, embeds child documents, and inserts them into Chroma."
+    },
+    {
+      "id": "search.bm25",
+      "type": "keyword_index",
+      "path": "rag_app/search/bm25_index.py",
+      "storage": "storage/bm25_index.pkl",
+      "responsibility": "Tokenizes child chunks with underthesea and searches BM25 grouped by parent doc_id."
+    },
+    {
+      "id": "storage.sqlite",
+      "type": "database",
+      "path": "backend/uit_chatbot.db",
+      "responsibility": "Stores users, majors, chat histories, and knowledge document management rows."
+    },
+    {
+      "id": "storage.raw_pdf",
+      "type": "filesystem_directory",
+      "path": "data/raw/pdf",
+      "responsibility": "Raw uploaded/manual PDF documents."
+    },
+    {
+      "id": "storage.raw_html",
+      "type": "filesystem_directory",
+      "path": "data/raw/html",
+      "responsibility": "Raw uploaded/manual HTML documents and HTML converted from TXT/MD uploads."
+    },
+    {
+      "id": "storage.parents",
+      "type": "jsonl",
+      "path": "data/processed/multivector_preview/parents.jsonl",
+      "responsibility": "Parent documents returned to LLM after child-vector retrieval."
+    },
+    {
+      "id": "storage.children",
+      "type": "jsonl",
+      "path": "data/processed/multivector_preview/children.jsonl",
+      "responsibility": "Child documents embedded into Chroma and indexed by BM25."
+    },
+    {
+      "id": "storage.chroma",
+      "type": "vector_database",
+      "path": "storage/chroma",
+      "responsibility": "Persistent Chroma collection of embedded child chunks."
+    },
+    {
+      "id": "model.embedding",
+      "type": "embedding_model",
+      "name": "HuggingFaceEmbeddings",
+      "default_model": "BAAI/bge-m3",
+      "responsibility": "Embeds child chunks during ingestion and embeds query text during vector retrieval."
+    },
+    {
+      "id": "model.llm",
+      "type": "llm",
+      "name": "ChatGoogleGenerativeAI",
+      "default_model": "gemini-2.5-flash",
+      "responsibility": "Question rewrite, answer generation, and memory summarization."
+    }
+  ],
+  "edges": [
+    {
+      "from": "frontend.chat",
+      "to": "frontend.api",
+      "label": "POST /api/v1/chat/ with message and user_id"
+    },
+    {
+      "from": "frontend.api",
+      "to": "backend.chat_route",
+      "label": "HTTP chat request"
+    },
+    {
+      "from": "backend.chat_route",
+      "to": "rag.retriever",
+      "label": "is_retrieval_index_ready"
+    },
+    {
+      "from": "backend.chat_route",
+      "to": "rag.chain",
+      "label": "answer_question"
+    },
+    {
+      "from": "rag.chain",
+      "to": "rag.memory",
+      "label": "load memory for rewrite and prompt"
+    },
+    {
+      "from": "rag.chain",
+      "to": "model.llm",
+      "label": "optional rewrite, final answer, optional memory summary"
+    },
+    {
+      "from": "rag.chain",
+      "to": "rag.retriever",
+      "label": "retrieve_docs"
+    },
+    {
+      "from": "rag.retriever",
+      "to": "model.embedding",
+      "label": "query embedding through Chroma embedding_function"
+    },
+    {
+      "from": "rag.retriever",
+      "to": "storage.chroma",
+      "label": "semantic child search"
+    },
+    {
+      "from": "rag.retriever",
+      "to": "search.bm25",
+      "label": "keyword child search"
+    },
+    {
+      "from": "rag.retriever",
+      "to": "storage.parents",
+      "label": "load parent docstore and return parent docs"
+    },
+    {
+      "from": "backend.chat_route",
+      "to": "storage.sqlite",
+      "label": "save ChatHistory"
+    },
+    {
+      "from": "frontend.admin",
+      "to": "frontend.api",
+      "label": "knowledge upload/list/status/reindex/delete"
+    },
+    {
+      "from": "frontend.api",
+      "to": "backend.knowledge_route",
+      "label": "HTTP knowledge management"
+    },
+    {
+      "from": "backend.knowledge_route",
+      "to": "storage.raw_pdf",
+      "label": "save PDF upload"
+    },
+    {
+      "from": "backend.knowledge_route",
+      "to": "storage.raw_html",
+      "label": "save HTML or TXT/MD-converted HTML"
+    },
+    {
+      "from": "backend.knowledge_route",
+      "to": "backend.ingest_service",
+      "label": "BackgroundTasks.add_task(run_knowledge_ingest)"
+    },
+    {
+      "from": "backend.ingest_service",
+      "to": "index.pipeline",
+      "label": "run_prepare_multivector"
+    },
+    {
+      "from": "index.pipeline",
+      "to": "storage.parents",
+      "label": "write parents.jsonl"
+    },
+    {
+      "from": "index.pipeline",
+      "to": "storage.children",
+      "label": "write children.jsonl"
+    },
+    {
+      "from": "backend.ingest_service",
+      "to": "index.vector_ingest",
+      "label": "ingest"
+    },
+    {
+      "from": "index.vector_ingest",
+      "to": "model.embedding",
+      "label": "embed child documents"
+    },
+    {
+      "from": "index.vector_ingest",
+      "to": "storage.chroma",
+      "label": "add child documents"
+    },
+    {
+      "from": "backend.ingest_service",
+      "to": "search.bm25",
+      "label": "rebuild_bm25_indexer"
+    }
+  ],
+  "flows": {
+    "chat": [
+      "frontend.chat sends message to /api/v1/chat/",
+      "backend.chat_route checks retrieval index readiness",
+      "rag.chain optionally rewrites follow-up question",
+      "rag.retriever plans intent-specific queries",
+      "Chroma embeds query and retrieves child chunks",
+      "BM25 retrieves keyword-matched child chunks",
+      "RRF fusion returns parent documents",
+      "rag.chain builds context-only prompt with memory and retrieved context",
+      "Gemini generates answer",
+      "memory and SQL chat history are updated",
+      "frontend.chat renders reply and sources"
+    ],
+    "knowledge_ingestion": [
+      "frontend.admin uploads document to /api/v1/knowledge/upload",
+      "backend.knowledge_route saves file and creates KnowledgeDocument status processing",
+      "FastAPI background task calls run_knowledge_ingest",
+      "index.pipeline rebuilds parent and child JSONL from all raw sources",
+      "text/table/image chunkers create child records",
+      "scripts.ingest_multivector embeds children and inserts into Chroma",
+      "BM25 index is rebuilt from children.jsonl",
+      "retriever caches are reset",
+      "KnowledgeDocument is marked indexed or failed"
+    ]
+  }
+}

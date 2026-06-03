@@ -1,0 +1,143 @@
+flowchart LR
+  subgraph Frontend
+    App["frontend/src/App.jsx"]
+    ApiClient["frontend/src/lib/api.js"]
+    ChatUI["frontend/src/pages/ChatPage.jsx"]
+    AdminUI["frontend/src/pages/AdminPage.jsx"]
+    HistoryUI["frontend/src/pages/HistoryPage.jsx"]
+    LookupUI["frontend/src/pages/LookupPage.jsx"]
+  end
+
+  subgraph Backend
+    Main["backend/app/main.py"]
+    ChatRoute["backend/app/api/chat.py"]
+    KnowledgeRoute["backend/app/api/knowledge.py"]
+    AdminRoute["backend/app/api/admin.py"]
+    AuthRoute["backend/app/api/auth.py"]
+    MajorRoute["backend/app/api/major.py"]
+    Security["backend/app/core/security.py"]
+    DB["backend/app/db/session.py"]
+    KnowledgeModel["KnowledgeDocument"]
+    ChatHistoryModel["ChatHistory"]
+    MajorModel["Major"]
+    UserModel["User"]
+    IngestService["backend/app/services/knowledge_ingest_service.py"]
+  end
+
+  subgraph RAG
+    Chain["rag_app/rag/chain.py"]
+    Retriever["rag_app/rag/retriever.py"]
+    Memory["rag_app/rag/memory.py"]
+    Prompts["rag_app/core/prompts.py"]
+    Config["rag_app/core/config.py"]
+    BM25["rag_app/search/bm25_index.py"]
+    Reranker["rag_app/rag/reranker.py"]
+  end
+
+  subgraph Indexing
+    Pipeline["rag_app/indexing/pipeline.py"]
+    PDFLoader["rag_app/loaders/pdf_loader.py"]
+    HTMLLoader["rag_app/loaders/html_loader.py"]
+    TextChunker["rag_app/chunking/text_chunker.py"]
+    TableChunker["rag_app/chunking/table_chunker.py"]
+    ImageChunker["rag_app/chunking/image_chunker.py"]
+    VectorIngest["scripts/ingest_multivector.py"]
+  end
+
+  subgraph Storage
+    SQLite[("backend/uit_chatbot.db")]
+    RawPDF[("data/raw/pdf")]
+    RawHTML[("data/raw/html")]
+    RawText[("data/raw/text")]
+    Parents[("parents.jsonl")]
+    Children[("children.jsonl")]
+    Chroma[("storage/chroma")]
+    BM25File[("storage/bm25_index.pkl")]
+    MemoryFiles[("storage/memory/*.json")]
+  end
+
+  subgraph Models
+    Embeddings["HuggingFaceEmbeddings / BAAI/bge-m3"]
+    Gemini["ChatGoogleGenerativeAI / Gemini"]
+  end
+
+  App --> ChatUI
+  App --> AdminUI
+  App --> HistoryUI
+  App --> LookupUI
+  ChatUI --> ApiClient
+  AdminUI --> ApiClient
+  HistoryUI --> ApiClient
+  LookupUI --> ApiClient
+
+  ApiClient -- "POST /api/v1/chat/" --> ChatRoute
+  ApiClient -- "GET/POST/DELETE /api/v1/knowledge/*" --> KnowledgeRoute
+  ApiClient -- "GET /api/v1/admin/stats" --> AdminRoute
+  ApiClient -- "/api/v1/auth/*" --> AuthRoute
+  ApiClient -- "/api/v1/majors/*" --> MajorRoute
+
+  Main --> ChatRoute
+  Main --> KnowledgeRoute
+  Main --> AdminRoute
+  Main --> AuthRoute
+  Main --> MajorRoute
+  Main --> DB
+  Main --> Chain
+  Main --> Retriever
+
+  ChatRoute --> Retriever
+  ChatRoute --> Chain
+  ChatRoute --> ChatHistoryModel
+  ChatRoute --> MajorModel
+  ChatHistoryModel --> SQLite
+  MajorModel --> SQLite
+
+  Chain --> Memory
+  Chain --> Retriever
+  Chain --> Prompts
+  Chain --> Gemini
+  Chain --> MemoryFiles
+
+  Retriever --> Embeddings
+  Retriever --> Chroma
+  Retriever --> Parents
+  Retriever --> BM25
+  Retriever --> Reranker
+  BM25 --> BM25File
+  BM25 --> Children
+
+  KnowledgeRoute --> Security
+  KnowledgeRoute --> KnowledgeModel
+  KnowledgeRoute --> RawPDF
+  KnowledgeRoute --> RawHTML
+  KnowledgeRoute --> RawText
+  KnowledgeRoute --> IngestService
+  KnowledgeModel --> SQLite
+
+  IngestService --> Pipeline
+  IngestService --> VectorIngest
+  IngestService --> BM25
+  IngestService --> Retriever
+  IngestService --> KnowledgeModel
+
+  Pipeline --> PDFLoader
+  Pipeline --> HTMLLoader
+  Pipeline --> TextChunker
+  Pipeline --> TableChunker
+  Pipeline --> ImageChunker
+  PDFLoader --> RawPDF
+  HTMLLoader --> RawHTML
+  TextChunker --> Children
+  TableChunker --> Children
+  ImageChunker --> Children
+  Pipeline --> Parents
+  Pipeline --> Children
+
+  VectorIngest --> Parents
+  VectorIngest --> Children
+  VectorIngest --> Embeddings
+  VectorIngest --> Chroma
+  VectorIngest --> Config
+  Retriever --> Config
+  Chain --> Config
+  Pipeline --> Config

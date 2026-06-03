@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bot, History, Search, LayoutDashboard, LogIn, LogOut } from 'lucide-react';
+import { Bot, History, Home, Search, LayoutDashboard, LogIn, LogOut } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 
 const Navbar = () => {
@@ -14,12 +14,18 @@ const Navbar = () => {
 
   const isDarkPage = location.pathname === '/login';
 
-  // Lọc danh sách tab cơ bản
-  const navItems = [
+  const guestNavItems = [
+    { path: '/', name: 'Trang chủ', icon: <Home className="w-4 h-4" /> },
+    { path: '/lookup', name: 'Tra cứu', icon: <Search className="w-4 h-4" /> },
+  ];
+
+  const authedNavItems = [
     { path: '/chat', name: 'Chatbot', icon: <Bot className="w-4 h-4" /> },
     { path: '/lookup', name: 'Tra cứu', icon: <Search className="w-4 h-4" /> },
     { path: '/history', name: 'Lịch sử', icon: <History className="w-4 h-4" /> },
   ];
+
+  const navItems = user ? authedNavItems : guestNavItems;
 
   // Nếu user đăng nhập và có quyền admin thì mới thấy tab Quản trị
   if (user && user.role === 'admin') {
@@ -109,7 +115,7 @@ const Navbar = () => {
             !isDarkPage && (
               <Link to="/login" className="relative group overflow-hidden flex items-center gap-2 px-4 py-2 bg-[#003366] text-white rounded-full text-xs font-bold transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-900/20 outline-none focus-visible:ring-2 focus-visible:ring-[#0ea5e9]/60 sm:px-5">
                 <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Đăng nhập</span>
+                <span className="hidden sm:inline">Đăng nhập / Đăng ký</span>
                 <motion.div 
                   className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full"
                   animate={{ translateX: '200%' }}
