@@ -45,21 +45,6 @@ const getChatErrorMessage = (error) => {
   return 'Xin lỗi, hệ thống máy chủ hiện không phản hồi.';
 };
 
-const getSourceTitle = (source) => {
-  if (source.title || source.source_title) {
-    return source.title || source.source_title;
-  }
-
-  const rawSource = source.file || source.source || '';
-  const fileName = rawSource.split(/[\\/]/).pop();
-
-  if (!fileName) {
-    return 'Nguồn tham khảo';
-  }
-
-  return fileName.replace(/\.[^/.]+$/, '').replaceAll('_', ' ');
-};
-
 const ChatPage = () => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
@@ -381,21 +366,6 @@ const ChatPage = () => {
                         {msg.collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
                         {msg.collapsed ? 'Xem thêm' : 'Thu gọn'}
                       </button>
-                    )}
-
-                    {isBot && msg.sources?.length > 0 && (
-                      <div className="mt-4 border-t border-gray-100 pt-3">
-                        <p className="mb-2 text-xs font-black uppercase tracking-wide text-gray-400">Nguồn tham khảo</p>
-                        <div className="space-y-2">
-                          {msg.sources.map((source, index) => (
-                            <div key={`${msg.id}-source-${index}`} className="rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
-                              <p className="font-bold text-gray-800">{getSourceTitle(source)}</p>
-                              {source.page && <p>Trang: {source.page}</p>}
-                              {source.score && <p>Score: {source.score}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     )}
 
                     {isBot && (
