@@ -11,7 +11,7 @@ export const authApi = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('uit_token');
+  const token = sessionStorage.getItem('uit_token');
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -26,6 +26,8 @@ api.interceptors.response.use(
     const status = error.response?.status;
 
     if ((status === 401 || status === 403) && !error.config?.skipAuthRedirect) {
+      sessionStorage.removeItem('uit_user');
+      sessionStorage.removeItem('uit_token');
       localStorage.removeItem('uit_user');
       localStorage.removeItem('uit_token');
 

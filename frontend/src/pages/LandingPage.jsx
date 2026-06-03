@@ -17,26 +17,26 @@ import heroImage from '../assets/uit-campus.jpg';
 
 const highlights = [
   {
-    title: 'Tra cứu ngành học',
-    description: 'Tìm mã ngành, tên ngành, tổ hợp xét tuyển và học phí UIT trong một nơi.',
+    title: 'Tìm nhanh thông tin ngành',
+    description: 'Xem mã ngành, chỉ tiêu, tổ hợp xét tuyển, học phí và mô tả ngành theo dữ liệu đã chuẩn bị.',
     icon: <Search className="h-5 w-5" />,
   },
   {
-    title: 'Hỏi đáp tuyển sinh',
-    description: 'Đặt câu hỏi tự nhiên về phương thức xét tuyển, học phí, ngành học và thông tin tuyển sinh.',
+    title: 'Hỏi như đang tư vấn trực tiếp',
+    description: 'Nhập câu hỏi bằng tiếng Việt tự nhiên về tuyển sinh, chương trình đào tạo hoặc học bổng UIT.',
     icon: <Bot className="h-5 w-5" />,
   },
   {
-    title: 'Nguồn từ tài liệu',
-    description: 'Câu trả lời được hỗ trợ bởi dữ liệu tri thức và tài liệu tuyển sinh đã nạp vào hệ thống.',
+    title: 'Câu trả lời có nguồn tham khảo',
+    description: 'Chatbot truy xuất từ kho tài liệu RAG và hiển thị nguồn để bạn kiểm tra lại khi cần.',
     icon: <FileSearch className="h-5 w-5" />,
   },
 ];
 
 const steps = [
-  'Tra cứu nhanh ngành học mà không cần tài khoản.',
-  'Đăng nhập để hỏi chatbot và lưu lịch sử tư vấn.',
-  'Quay lại lịch sử khi cần xem lại câu trả lời quan trọng.',
+  'Bắt đầu bằng trang Tra cứu nếu bạn chỉ muốn xem nhanh thông tin ngành.',
+  'Đăng nhập hoặc đăng ký tài khoản khi bạn muốn hỏi chatbot chi tiết hơn.',
+  'Sau khi đăng nhập, hệ thống lưu lịch sử để bạn xem lại các câu trả lời quan trọng.',
 ];
 
 const LandingPage = () => {
@@ -74,14 +74,14 @@ const LandingPage = () => {
           >
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/70 px-4 py-2 text-xs font-black uppercase text-[#0b5c94] shadow-sm backdrop-blur-md">
               <GraduationCap className="h-4 w-4 text-[#0ea5e9]" />
-              Hệ thống tư vấn tuyển sinh UIT
+              UIT Admission Assistant
             </div>
 
             <h1 className="max-w-4xl text-4xl font-black leading-tight tracking-normal text-[#003366] sm:text-5xl lg:text-7xl">
-              Tìm thông tin tuyển sinh UIT nhanh hơn, rõ hơn.
+              Trợ lý tra cứu và tư vấn tuyển sinh UIT.
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-gray-600 sm:text-lg">
-              Tra cứu ngành học, học phí, tổ hợp xét tuyển và hỏi đáp từ tài liệu tuyển sinh bằng chatbot RAG.
+              Tìm thông tin ngành học, phương thức xét tuyển, học phí và chương trình đào tạo từ kho dữ liệu tuyển sinh đã được hệ thống hóa.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -126,17 +126,17 @@ const LandingPage = () => {
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="mb-3 text-sm font-black uppercase text-[#0ea5e9]">Dành cho khách truy cập</p>
-            <h2 className="text-3xl font-black text-[#003366] sm:text-4xl">Navbar guest nên dẫn đúng việc người dùng làm được.</h2>
+            <h2 className="text-3xl font-black text-[#003366] sm:text-4xl">Bắt đầu nhanh mà không cần đăng nhập.</h2>
             <p className="mt-5 text-base leading-8 text-gray-600">
-              Vì chatbot và lịch sử cần tài khoản, khách truy cập nên được đưa đến trang chủ, tra cứu ngành và đăng nhập. Như vậy thanh điều hướng không làm người dùng bấm vào những trang bị chặn.
+              Nếu bạn chỉ cần xem danh sách ngành, hãy dùng trang Tra cứu. Khi cần hỏi sâu hơn, đăng nhập để chatbot có thể lưu lịch sử tư vấn và hỗ trợ các câu hỏi nối tiếp.
             </p>
           </div>
 
           <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
             <div className="mb-5 flex items-center justify-between gap-4 border-b border-gray-100 pb-4">
               <div>
-                <p className="text-xs font-black uppercase text-gray-400">Luồng đề xuất</p>
-                <h3 className="text-xl font-black text-[#003366]">Guest journey</h3>
+                <p className="text-xs font-black uppercase text-gray-400">Cách sử dụng</p>
+                <h3 className="text-xl font-black text-[#003366]">Luồng tư vấn gọn gàng</h3>
               </div>
               <ShieldCheck className="h-8 w-8 text-emerald-500" />
             </div>
@@ -158,18 +158,18 @@ const LandingPage = () => {
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 md:grid-cols-3">
           <div className="rounded-3xl bg-[#003366] p-7 text-white shadow-lg shadow-blue-900/15">
             <BookOpen className="mb-5 h-8 w-8 text-[#7dd3fc]" />
-            <h3 className="text-xl font-black">Thông tin ngành</h3>
-            <p className="mt-3 text-sm leading-6 text-blue-100">Xem nhanh mô tả ngành, mã ngành, học phí và tổ hợp xét tuyển.</p>
+            <h3 className="text-xl font-black">Dữ liệu tuyển sinh</h3>
+            <p className="mt-3 text-sm leading-6 text-blue-100">Tổng hợp thông tin từ đề án tuyển sinh, tài liệu ngành học và dữ liệu quản trị.</p>
           </div>
           <div className="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
             <Bot className="mb-5 h-8 w-8 text-[#0ea5e9]" />
-            <h3 className="text-xl font-black text-[#003366]">Chatbot cá nhân</h3>
-            <p className="mt-3 text-sm leading-6 text-gray-500">Đăng nhập để hỏi chi tiết hơn và nhận câu trả lời theo ngữ cảnh tuyển sinh UIT.</p>
+            <h3 className="text-xl font-black text-[#003366]">Chatbot RAG</h3>
+            <p className="mt-3 text-sm leading-6 text-gray-500">Truy xuất tài liệu liên quan trước khi sinh câu trả lời, hạn chế trả lời ngoài dữ liệu.</p>
           </div>
           <div className="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm">
             <History className="mb-5 h-8 w-8 text-[#0ea5e9]" />
-            <h3 className="text-xl font-black text-[#003366]">Lưu lịch sử</h3>
-            <p className="mt-3 text-sm leading-6 text-gray-500">Xem lại các câu hỏi đã trao đổi sau khi đăng nhập tài khoản của bạn.</p>
+            <h3 className="text-xl font-black text-[#003366]">Theo dõi lịch sử</h3>
+            <p className="mt-3 text-sm leading-6 text-gray-500">Các phiên hỏi đáp sau khi đăng nhập được lưu lại để tiếp tục tra cứu khi cần.</p>
           </div>
         </div>
       </section>
@@ -179,10 +179,10 @@ const LandingPage = () => {
           <div>
             <div className="mb-3 flex items-center gap-2 text-sm font-black text-emerald-600">
               <CheckCircle2 className="h-4 w-4" />
-              Sẵn sàng bắt đầu
+              Sẵn sàng tư vấn
             </div>
-            <h2 className="text-2xl font-black text-[#003366]">Muốn hỏi sâu hơn về tuyển sinh UIT?</h2>
-            <p className="mt-2 text-sm leading-6 text-gray-500">Đăng nhập để chatbot ghi nhớ lịch sử tư vấn và hỗ trợ bạn xuyên suốt quá trình tìm hiểu.</p>
+            <h2 className="text-2xl font-black text-[#003366]">Bạn muốn hỏi chi tiết về ngành hoặc phương thức xét tuyển?</h2>
+            <p className="mt-2 text-sm leading-6 text-gray-500">Đăng nhập hoặc đăng ký tài khoản để bắt đầu phiên tư vấn với chatbot.</p>
           </div>
           <Link
             to={isAuthenticated ? '/chat' : '/login'}

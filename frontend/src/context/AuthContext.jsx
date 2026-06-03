@@ -4,7 +4,10 @@ import { authApi } from '../lib/api';
 export const AuthContext = createContext();
 
 const readStoredUser = () => {
-  const storedUser = localStorage.getItem('uit_user');
+  localStorage.removeItem('uit_user');
+  localStorage.removeItem('uit_token');
+
+  const storedUser = sessionStorage.getItem('uit_user');
 
   if (!storedUser) {
     return null;
@@ -13,14 +16,14 @@ const readStoredUser = () => {
   try {
     return JSON.parse(storedUser);
   } catch {
-    localStorage.removeItem('uit_user');
+    sessionStorage.removeItem('uit_user');
     return null;
   }
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(readStoredUser);
-  const [token, setToken] = useState(() => localStorage.getItem('uit_token'));
+  const [token, setToken] = useState(() => sessionStorage.getItem('uit_token'));
 
   const saveSession = (authData) => {
     const nextUser = authData.user;
@@ -28,8 +31,8 @@ export const AuthProvider = ({ children }) => {
 
     setUser(nextUser);
     setToken(nextToken);
-    localStorage.setItem('uit_user', JSON.stringify(nextUser));
-    localStorage.setItem('uit_token', nextToken);
+    sessionStorage.setItem('uit_user', JSON.stringify(nextUser));
+    sessionStorage.setItem('uit_token', nextToken);
 
     return authData;
   };
@@ -52,6 +55,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setToken(null);
+    sessionStorage.removeItem('uit_user');
+    sessionStorage.removeItem('uit_token');
     localStorage.removeItem('uit_user');
     localStorage.removeItem('uit_token');
   };
